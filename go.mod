@@ -1,4 +1,4 @@
-module github.com/zenground0/onramp-contracts/contract-tools/xchain
+module github.com/FIL-Builders/xchainClient
 
 go 1.22.2
 
