@@ -84,9 +84,9 @@ func main() {
 				Action: func(cctx *cli.Context) error {
 					isBuffer := cctx.Bool("buffer-service")
 					isAgg := cctx.Bool("aggregation-service")
-					// if !isBuffer && !isAgg { // default to running aggregator
-					// 	isAgg = true
-					// }
+					if !isBuffer && !isAgg { // default to running aggregator
+						isAgg = true
+					}
 
 					cfg, err := LoadConfig(cctx.String("config"))
 					if err != nil {
@@ -150,7 +150,7 @@ func main() {
 					{
 						Name:      "offer",
 						Usage:     "Offer data by providing file and payment parameters",
-						ArgsUsage: "<commP> <size> <bufferLocation> <token-hex> <token-amount>",
+						ArgsUsage: "<commP> <size> <cid> <bufferLocation> <token-hex> <token-amount>",
 						Action: func(cctx *cli.Context) error {
 							cfg, err := LoadConfig(cctx.String("config"))
 							if err != nil {
@@ -188,6 +188,7 @@ func main() {
 								cctx.Args().Get(2),
 								cctx.Args().Get(3),
 								cctx.Args().Get(4),
+								cctx.Args().Get(5),
 								*parsedABI,
 							)
 
@@ -212,7 +213,7 @@ func main() {
 					{
 						Name:      "dealStatus",
 						Usage:     "Check deal status for a specific CID",
-						ArgsUsage: "<cid>",
+						ArgsUsage: "<cid> <offerId>",
 						Action: func(cctx *cli.Context) error {
 							cfg, err := LoadConfig(cctx.String("config"))
 							if err != nil {
@@ -225,7 +226,14 @@ func main() {
 								return nil
 							}
 
+							offerId := cctx.Args().Get(1)
+							if offerId == "" {
+								log.Printf("Please provide offerID to check deal status")
+								return nil
+							}
+
 							//Request deal status from Lighthouse Deal Engine
+							log.Println("Start checking deal status and process aggregation for CID", cidString)
 							proofResponse, err := getDealStatus(cidString, cfg.LighthouseAuth)
 							if err != nil {
 								log.Fatalf("Error in GET request: %v", err)
@@ -235,6 +243,9 @@ func main() {
 								fmt.Println("Error:", err)
 								return nil
 							}
+							log.Println("offer ID is ", offerId)
+							log.Println("commP is ", commP)
+							log.Println("proofSubtree is ", proofSubtree)
 
 							// Dial network
 							client, err := ethclient.Dial(cfg.Api)
@@ -262,7 +273,7 @@ func main() {
 
 							inclProofs := make([]merkletree.ProofData, 1)
 							ids := make([]uint64, 1)
-							ids[0] = 10
+							ids[0] = 42
 							inclProofs[0] = proofSubtree
 
 							tx, err := onramp.Transact(auth, "commitAggregate", commP.Bytes(), ids, inclProofs, common.HexToAddress(cfg.PayoutAddr))
@@ -321,6 +332,7 @@ type Config struct {
 type Offer struct {
 	CommP    []uint8        `json:"commP"`
 	Size     uint64         `json:"size"`
+	Cid      string         `json:"cid"`
 	Location string         `json:"location"`
 	Amount   *big.Int       `json:"amount"`
 	Token    common.Address `json:"token"`
@@ -583,10 +595,10 @@ func (a *aggregator) sendingToLighthouseDe(ctx context.Context) error {
 			return nil
 		case latestEvent := <-a.ch:
 			log.Println("Processing Offer ", latestEvent.OfferID)
+			log.Println("Offer CID ", latestEvent.Offer.Cid)
 
 			// Check if the offer is too big to fit in a valid aggregate on its own
-			cid := "QmeunfBSvUwcocnnjxfNy1DVAcGCK9iyJNCYBrSidxr6ue"
-			sendToLighthouseDE(cid, a.LighthouseAuth)
+			sendToLighthouseDE(latestEvent.Offer.Cid, a.LighthouseAuth)
 		}
 	}
 }
@@ -992,8 +1004,9 @@ LOOP:
 
 			log.Printf("Sending offer NO. %d for aggregation\n", event.OfferID)
 			log.Printf("  Offer:\n")
-			log.Printf("    CommP: %v\n", string(event.Offer.CommP))
+			log.Printf("    Offer: %v\n", event.Offer.CommP)
 			log.Printf("    Size: %d\n", event.Offer.Size)
+			log.Printf("    Cid: %s\n", event.Offer.Cid)
 			log.Printf("    Location: %s\n", event.Offer.Location)
 			log.Printf("    Amount: %s\n", event.Offer.Amount.String()) // big.Int needs .String() for printing
 			log.Printf("    Token: %s\n", event.Offer.Token.Hex())      // Address needs .Hex() for printing
@@ -1052,10 +1065,10 @@ func HandleOffer(offer *Offer) error {
 	return nil
 }
 
-func MakeOffer(cidStr string, sizeStr string, location string, token string, amountStr string, abi abi.ABI) (*Offer, error) {
-	log.Printf("MakeOffer called with cidStr: %s, sizeStr: %s, location: %s, token: %s, amountStr: %s\n", cidStr, sizeStr, location, token, amountStr)
+func MakeOffer(commpStr string, sizeStr string, cidStr string, location string, token string, amountStr string, abi abi.ABI) (*Offer, error) {
+	log.Printf("MakeOffer called with commpStr: %s, sizeStr: %s, cidStr: %s,  location: %s, token: %s, amountStr: %s\n", commpStr, sizeStr, cidStr, location, token, amountStr)
 
-	commP, err := cid.Decode(cidStr)
+	commP, err := cid.Decode(commpStr)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse cid %w", err)
 	}
@@ -1074,6 +1087,7 @@ func MakeOffer(cidStr string, sizeStr string, location string, token string, amo
 	offer := Offer{
 		CommP:    commP.Bytes(),
 		Location: location,
+		Cid:      cidStr,
 		Token:    common.HexToAddress(token),
 		Amount:   amountBig,
 		Size:     uint64(size),
