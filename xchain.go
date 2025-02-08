@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"context"
 	"encoding/hex"
+	"path/filepath"
+
 	"encoding/json"
 	"fmt"
 	"io"
@@ -291,6 +293,39 @@ func main() {
 							return nil
 						},
 					},
+				},
+			},
+			{
+				Name:  "generate-account",
+				Usage: "Generate a new Ethereum keystore account",
+				Flags: []cli.Flag{
+					&cli.StringFlag{
+						Name:     "keystore-folder",
+						Usage:    "Path to the keystore directory",
+						Required: true,
+					},
+					&cli.StringFlag{
+						Name:     "password",
+						Usage:    "Password to encrypt the keystore file",
+						Required: true,
+					},
+				},
+				Action: func(cctx *cli.Context) error {
+					keystoreDir := cctx.String("keystore-folder")
+					password := cctx.String("password")
+
+					// Validate and create keystore
+					accountAddress, keystoreFilePath, err := generateEthereumAccount(keystoreDir, password)
+					if err != nil {
+						log.Fatalf("Error generating account: %v", err)
+					}
+
+					// Output generated account info
+					fmt.Println("New Ethereum account created!")
+					fmt.Println("Address:", accountAddress)
+					fmt.Println("Keystore File Path:", keystoreFilePath)
+
+					return nil
 				},
 			},
 		},
@@ -1197,4 +1232,24 @@ func encodeChainID(chainID *big.Int) ([]byte, error) {
 	}
 
 	return data, nil
+}
+
+// generateEthereumAccount creates a new Ethereum account and stores it in a keystore file
+func generateEthereumAccount(keystoreDir, password string) (string, string, error) {
+	// Ensure keystore directory exists
+	if err := os.MkdirAll(keystoreDir, 0700); err != nil {
+		return "", "", fmt.Errorf("failed to create keystore directory: %v", err)
+	}
+
+	// Create a new keystore instance
+	ks := keystore.NewKeyStore(keystoreDir, keystore.StandardScryptN, keystore.StandardScryptP)
+
+	// Generate a new account
+	account, err := ks.NewAccount(password)
+	if err != nil {
+		return "", "", fmt.Errorf("failed to create new account: %v", err)
+	}
+
+	// Return account address and keystore file path
+	return account.Address.Hex(), filepath.Join(keystoreDir, filepath.Base(account.URL.Path)), nil
 }
