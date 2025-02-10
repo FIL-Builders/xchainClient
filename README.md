@@ -11,7 +11,7 @@ Ensure you have **Go 1.18+** installed. Then, clone the repository and build the
 ```sh
 git clone https://github.com/your-repo/xchainClient.git
 cd xchainClient
-go build -o xchain
+go build -o xchainClient
 ```
 ---
 
@@ -20,7 +20,7 @@ go build -o xchain
 A new command, `generate-account`, allows you to create an Ethereum keystore account and store it at a **specific file path**.
 
 ```sh
-xchain generate-account --keystore-file ~/onramp-contracts/xchain_key.json --password "yourpassword"
+./xchainClient generate-account --keystore-file ~/onramp-contracts/xchain_key.json --password "yourpassword"
 ```
 
 ### **Example Output**
@@ -40,7 +40,7 @@ Keystore File Path: /home/user/onramp-contracts/xchain_key.json
 To start the Xchain adapter daemon, run:
 
 ```sh
-xchain daemon --config ./config/config.json --buffer-service --aggregation-service
+./xchainClient daemon --config ./config/config.json --buffer-service --aggregation-service
 ```
 
 ---
@@ -50,12 +50,12 @@ xchain daemon --config ./config/config.json --buffer-service --aggregation-servi
 To submit an offer to the OnRamp contract:
 
 ```sh
-xchain client offer <commP> <size> <cid> <bufferLocation> <token-hex> <token-amount>
+./xchainClient client offer <commP> <size> <cid> <bufferLocation> <token-hex> <token-amount>
 ```
 
 Example:
 ```sh
-xchain client offer bafkreihdwdcef4n... 128 /data/file1 /buffers/ 0x6B175474E89094C44Da98b954EedeAC495271d0F 1000
+./xchainClient client offer bafkreihdwdcef4n... 128 /data/file1 /buffers/ 0x6B175474E89094C44Da98b954EedeAC495271d0F 1000
 ```
 
 ---
@@ -65,12 +65,12 @@ xchain client offer bafkreihdwdcef4n... 128 /data/file1 /buffers/ 0x6B175474E890
 To check the deal status for a CID:
 
 ```sh
-xchain client dealStatus <cid> <offerId>
+./xchainClient client dealStatus <cid> <offerId>
 ```
 
 Example:
 ```sh
-xchain client dealStatus bafkreihdwdcef4n 42
+./xchainClient client dealStatus bafkreihdwdcef4n 42
 ```
 
 ---
