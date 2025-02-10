@@ -60,18 +60,16 @@ func main() {
 		Name:        "xchain",
 		Description: "Filecoin Xchain Data Services",
 		Usage:       "Export filecoin data storage to any blockchain",
-		Flags: []cli.Flag{
-			&cli.StringFlag{
-				Name:  "config",
-				Usage: "Path to the configuration file",
-				Value: "./config/config.json",
-			},
-		},
 		Commands: []*cli.Command{
 			{
 				Name:  "daemon",
 				Usage: "Start the xchain adapter daemon",
 				Flags: []cli.Flag{
+					&cli.StringFlag{
+						Name:  "config",
+						Usage: "Path to the configuration file",
+						Value: "./config/config.json",
+					},
 					&cli.BoolFlag{
 						Name:  "buffer-service",
 						Usage: "Run a buffer server",
@@ -153,6 +151,13 @@ func main() {
 						Name:      "offer",
 						Usage:     "Offer data by providing file and payment parameters",
 						ArgsUsage: "<commP> <size> <cid> <bufferLocation> <token-hex> <token-amount>",
+						Flags: []cli.Flag{
+							&cli.StringFlag{
+								Name:  "config",
+								Usage: "Path to the configuration file",
+								Value: "./config/config.json",
+							},
+						},
 						Action: func(cctx *cli.Context) error {
 							cfg, err := LoadConfig(cctx.String("config"))
 							if err != nil {
@@ -216,6 +221,13 @@ func main() {
 						Name:      "dealStatus",
 						Usage:     "Check deal status for a specific CID",
 						ArgsUsage: "<cid> <offerId>",
+						Flags: []cli.Flag{
+							&cli.StringFlag{
+								Name:  "config",
+								Usage: "Path to the configuration file",
+								Value: "./config/config.json",
+							},
+						},
 						Action: func(cctx *cli.Context) error {
 							cfg, err := LoadConfig(cctx.String("config"))
 							if err != nil {
