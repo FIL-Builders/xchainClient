@@ -58,7 +58,7 @@ Keystore File Path: /home/user/onramp-contracts/xchain_key.json
 To start the Xchain adapter daemon, run:
 
 ```sh
-./xchainClient daemon --config ./config/config.json --buffer-service --aggregation-service
+./xchainClient --config ./config/config.json daemon --buffer-service --aggregation-service
 ```
 
 ---
