@@ -13,55 +13,6 @@ git clone https://github.com/your-repo/xchainClient.git
 cd xchainClient
 go build -o xchain
 ```
-
----
-
-## 🛠️ Configuration
-
-### **Config File (`config.json`)**
-
-The Xchain Client now **uses a `config.json` file** for storing settings instead of a `.env` file. The configuration file should be placed inside the `config/` directory.
-
-#### **Example `config.json`**
-```json
-[
-  {
-    "ChainID": 314159,
-    "Api": "wss://wss.calibration.node.glif.io/apigw/lotus/rpc/v1",
-    "OnRampAddress": "0x750CbAcFbE58C453cEA1E5a2617193D60B7Cb451",
-    "ProverAddr": "0x61F0ACE5ad40466Eb43141fa56Cf87758b6ffbA8",
-    "KeyPath": "./config/xchain_key.json",
-    "ClientAddr": "0x5c31e78f3f7329769734f5ff1ac7e22c243e817e",
-    "PayoutAddr": "0x5c31e78f3f7329769734f5ff1ac7e22c243e817e",
-    "OnRampABIPath": "./config/onramp-abi.json",
-    "BufferPath": "~/.xchain/buffer",
-    "BufferPort": 5077,
-    "ProviderAddr": "t0116147",
-    "LotusAPI": "https://api.calibration.node.glif.io",
-    "LighthouseApiKey": "",
-    "LighthouseAuth": "u8t8gf6ds06re"
-  }
-]
-```
-
-### **Configuration Fields Explained**
-| Key | Description |
-|------|------------|
-| **ChainID** | Ethereum-compatible chain ID (e.g., `314159` for Filecoin Calibration Testnet). |
-| **Api** | WebSocket API URL for Ethereum client (e.g., Infura, Glif). |
-| **OnRampAddress** | Address of the OnRamp smart contract. |
-| **ProverAddr** | Ethereum address of the prover for verifying storage deals. |
-| **KeyPath** | Path to the keystore file that contains the Ethereum private key. |
-| **ClientAddr** | Ethereum wallet address used for making transactions. |
-| **PayoutAddr** | Address where storage rewards should be sent. |
-| **OnRampABIPath** | Path to the ABI file for the OnRamp contract. |
-| **BufferPath** | Directory where temporary storage is kept before aggregation. |
-| **BufferPort** | Port for the buffer service (`5077` by default). |
-| **ProviderAddr** | Filecoin storage provider ID. |
-| **LotusAPI** | Filecoin Lotus API endpoint (used for deal tracking). |
-| **LighthouseApiKey** | API key for interacting with Lighthouse storage (if applicable). |
-| **LighthouseAuth** | Authentication token for Lighthouse. |
-
 ---
 
 ## 🔑 **Generating an Ethereum Account**
@@ -140,6 +91,54 @@ Ensure the keystore file is correctly generated using `generate-account` and tha
 
 ### Error: "failed to connect to API"
 Check that your `Api` field in `config.json` is correctly set to a working Ethereum/Web3 provider.
+
+---
+
+## 🛠️ Configuration
+
+### **Config File (`config.json`)**
+
+The Xchain Client now **uses a `config.json` file** for storing settings instead of a `.env` file. The configuration file should be placed inside the `config/` directory.
+
+#### **Example `config.json`**
+```json
+[
+  {
+    "ChainID": 314159,
+    "Api": "wss://wss.calibration.node.glif.io/apigw/lotus/rpc/v1",
+    "OnRampAddress": "0x750CbAcFbE58C453cEA1E5a2617193D60B7Cb451",
+    "ProverAddr": "0x61F0ACE5ad40466Eb43141fa56Cf87758b6ffbA8",
+    "KeyPath": "./config/xchain_key.json",
+    "ClientAddr": "0x5c31e78f3f7329769734f5ff1ac7e22c243e817e",
+    "PayoutAddr": "0x5c31e78f3f7329769734f5ff1ac7e22c243e817e",
+    "OnRampABIPath": "./config/onramp-abi.json",
+    "BufferPath": "~/.xchain/buffer",
+    "BufferPort": 5077,
+    "ProviderAddr": "t0116147",
+    "LotusAPI": "https://api.calibration.node.glif.io",
+    "LighthouseApiKey": "",
+    "LighthouseAuth": "u8t8gf6ds06re"
+  }
+]
+```
+
+### **Configuration Fields Explained**
+| Key | Description |
+|------|------------|
+| **ChainID** | Ethereum-compatible chain ID (e.g., `314159` for Filecoin Calibration Testnet). |
+| **Api** | WebSocket API URL for Ethereum client (e.g., Infura, Glif). |
+| **OnRampAddress** | Address of the OnRamp smart contract. |
+| **ProverAddr** | Ethereum address of the prover for verifying storage deals. |
+| **KeyPath** | Path to the keystore file that contains the Ethereum private key. |
+| **ClientAddr** | Ethereum wallet address used for making transactions. |
+| **PayoutAddr** | Address where storage rewards should be sent. |
+| **OnRampABIPath** | Path to the ABI file for the OnRamp contract. |
+| **BufferPath** | Directory where temporary storage is kept before aggregation. |
+| **BufferPort** | Port for the buffer service (`5077` by default). |
+| **ProviderAddr** | Filecoin storage provider ID. |
+| **LotusAPI** | Filecoin Lotus API endpoint (used for deal tracking). |
+| **LighthouseApiKey** | API key for interacting with Lighthouse storage (if applicable). |
+| **LighthouseAuth** | Authentication token for Lighthouse. |
 
 ---
 
