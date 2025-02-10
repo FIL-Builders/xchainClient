@@ -15,12 +15,30 @@ go build -o xchainClient
 ```
 ---
 
+## 📌 Configure Environment Variables
+1. Create a `.env` file to store your **XCHAIN_PASSPHRASE** (used for unlocking the Ethereum keystore):
+
+```sh
+echo "XCHAIN_PASSPHRASE=your_secure_password" > .env
+```
+
+2. **Source the file** to load the variable into your environment:
+   ```sh
+   source .env
+   ```
+
+3. Verify that the variable is set:
+   ```sh
+   echo $XCHAIN_PASSPHRASE
+   ```
+
 ## 🔑 **Generating an Ethereum Account**
 
 A new command, `generate-account`, allows you to create an Ethereum keystore account and store it at a **specific file path**.
 
 ```sh
-./xchainClient generate-account --keystore-file ~/onramp-contracts/xchain_key.json --password "yourpassword"
+./xchainClient generate-account --keystore-file ./config/xchain_key.json --password "$XCHAIN_PASSPHRASE"
+
 ```
 
 ### **Example Output**

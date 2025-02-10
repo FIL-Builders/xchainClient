@@ -24,3 +24,7 @@ go.work.sum
 
 # env file
 .env
+
+
+# config
+./config/xchain_key.json
