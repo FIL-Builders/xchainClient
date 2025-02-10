@@ -300,8 +300,8 @@ func main() {
 				Usage: "Generate a new Ethereum keystore account",
 				Flags: []cli.Flag{
 					&cli.StringFlag{
-						Name:     "keystore-folder",
-						Usage:    "Path to the keystore directory",
+						Name:     "keystore-file",
+						Usage:    "Path to the keystore JSON file (must end in .json)",
 						Required: true,
 					},
 					&cli.StringFlag{
@@ -311,11 +311,11 @@ func main() {
 					},
 				},
 				Action: func(cctx *cli.Context) error {
-					keystoreDir := cctx.String("keystore-folder")
+					keystoreFile := cctx.String("keystore-file")
 					password := cctx.String("password")
 
 					// Validate and create keystore
-					accountAddress, keystoreFilePath, err := generateEthereumAccount(keystoreDir, password)
+					accountAddress, err := generateEthereumAccount(keystoreFile, password)
 					if err != nil {
 						log.Fatalf("Error generating account: %v", err)
 					}
@@ -323,7 +323,7 @@ func main() {
 					// Output generated account info
 					fmt.Println("New Ethereum account created!")
 					fmt.Println("Address:", accountAddress)
-					fmt.Println("Keystore File Path:", keystoreFilePath)
+					fmt.Println("Keystore File Path:", keystoreFile)
 
 					return nil
 				},
@@ -1234,22 +1234,44 @@ func encodeChainID(chainID *big.Int) ([]byte, error) {
 	return data, nil
 }
 
-// generateEthereumAccount creates a new Ethereum account and stores it in a keystore file
-func generateEthereumAccount(keystoreDir, password string) (string, string, error) {
-	// Ensure keystore directory exists
-	if err := os.MkdirAll(keystoreDir, 0700); err != nil {
-		return "", "", fmt.Errorf("failed to create keystore directory: %v", err)
+// generateEthereumAccount creates a new Ethereum account and saves it to the specified JSON file
+func generateEthereumAccount(keystoreFile, password string) (string, error) {
+	// Validate file extension
+	if filepath.Ext(keystoreFile) != ".json" {
+		return "", fmt.Errorf("keystore file must have a .json extension")
 	}
 
-	// Create a new keystore instance
-	ks := keystore.NewKeyStore(keystoreDir, keystore.StandardScryptN, keystore.StandardScryptP)
+	// Ensure directory exists
+	keystoreDir := filepath.Dir(keystoreFile)
+	if err := os.MkdirAll(keystoreDir, 0700); err != nil {
+		return "", fmt.Errorf("failed to create keystore directory: %v", err)
+	}
+
+	// Create a temporary keystore
+	tempDir, err := os.MkdirTemp("", "keystore-tmp")
+	if err != nil {
+		return "", fmt.Errorf("failed to create temporary keystore directory: %v", err)
+	}
+	defer os.RemoveAll(tempDir) // Cleanup temp keystore
+
+	ks := keystore.NewKeyStore(tempDir, keystore.StandardScryptN, keystore.StandardScryptP)
 
 	// Generate a new account
 	account, err := ks.NewAccount(password)
 	if err != nil {
-		return "", "", fmt.Errorf("failed to create new account: %v", err)
+		return "", fmt.Errorf("failed to create new account: %v", err)
 	}
 
-	// Return account address and keystore file path
-	return account.Address.Hex(), filepath.Join(keystoreDir, filepath.Base(account.URL.Path)), nil
+	// Read the generated keystore file
+	keyJSON, err := os.ReadFile(account.URL.Path)
+	if err != nil {
+		return "", fmt.Errorf("failed to read generated keystore file: %v", err)
+	}
+
+	// Save to the specified file path
+	if err := os.WriteFile(keystoreFile, keyJSON, 0600); err != nil {
+		return "", fmt.Errorf("failed to save keystore file: %v", err)
+	}
+
+	return account.Address.Hex(), nil
 }

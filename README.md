@@ -1,56 +1,152 @@
-# xchainClient
-The xchain clients takes care of data bridge events
+# Xchain Client
 
-### **1️⃣ Set Up Forge**
+Xchain Client provides a set of tools to facilitate cross-chain data movement from Filecoin storage to any blockchain. It includes utilities for managing Ethereum accounts, submitting offers, and handling deal status.
+
+---
+
+## 🚀 Installation
+
+Ensure you have **Go 1.18+** installed. Then, clone the repository and build the project:
+
 ```sh
-forge install
+git clone https://github.com/your-repo/xchainClient.git
+cd xchainClient
+go build -o xchain
 ```
 
-### **2️⃣ Install & Use Go 1.22.7**
-```sh
-gvm install go1.22.7
-gvm use go1.22.7
+---
+
+## 🛠️ Configuration
+
+### **Config File (`config.json`)**
+
+The Xchain Client now **uses a `config.json` file** for storing settings instead of a `.env` file. The configuration file should be placed inside the `config/` directory.
+
+#### **Example `config.json`**
+```json
+[
+  {
+    "ChainID": 314159,
+    "Api": "wss://wss.calibration.node.glif.io/apigw/lotus/rpc/v1",
+    "OnRampAddress": "0x750CbAcFbE58C453cEA1E5a2617193D60B7Cb451",
+    "ProverAddr": "0x61F0ACE5ad40466Eb43141fa56Cf87758b6ffbA8",
+    "KeyPath": "./config/xchain_key.json",
+    "ClientAddr": "0x5c31e78f3f7329769734f5ff1ac7e22c243e817e",
+    "PayoutAddr": "0x5c31e78f3f7329769734f5ff1ac7e22c243e817e",
+    "OnRampABIPath": "./config/onramp-abi.json",
+    "BufferPath": "~/.xchain/buffer",
+    "BufferPort": 5077,
+    "ProviderAddr": "t0116147",
+    "LotusAPI": "https://api.calibration.node.glif.io",
+    "LighthouseApiKey": "",
+    "LighthouseAuth": "u8t8gf6ds06re"
+  }
+]
 ```
 
-### **3️⃣ Build OnRamp Tools**
+### **Configuration Fields Explained**
+| Key | Description |
+|------|------------|
+| **ChainID** | Ethereum-compatible chain ID (e.g., `314159` for Filecoin Calibration Testnet). |
+| **Api** | WebSocket API URL for Ethereum client (e.g., Infura, Glif). |
+| **OnRampAddress** | Address of the OnRamp smart contract. |
+| **ProverAddr** | Ethereum address of the prover for verifying storage deals. |
+| **KeyPath** | Path to the keystore file that contains the Ethereum private key. |
+| **ClientAddr** | Ethereum wallet address used for making transactions. |
+| **PayoutAddr** | Address where storage rewards should be sent. |
+| **OnRampABIPath** | Path to the ABI file for the OnRamp contract. |
+| **BufferPath** | Directory where temporary storage is kept before aggregation. |
+| **BufferPort** | Port for the buffer service (`5077` by default). |
+| **ProviderAddr** | Filecoin storage provider ID. |
+| **LotusAPI** | Filecoin Lotus API endpoint (used for deal tracking). |
+| **LighthouseApiKey** | API key for interacting with Lighthouse storage (if applicable). |
+| **LighthouseAuth** | Authentication token for Lighthouse. |
+
+---
+
+## 🔑 **Generating an Ethereum Account**
+
+A new command, `generate-account`, allows you to create an Ethereum keystore account and store it at a **specific file path**.
+
 ```sh
-go build
+xchain generate-account --keystore-file ~/onramp-contracts/xchain_key.json --password "yourpassword"
 ```
 
-### **4️⃣ Generate Cross-Chain Keys**
-🔑 **Use xchainClient to create an Ethereum account for signing transactions**
-```sh
-./xchainClient generate-account --keystore-folder ~/onramp-contracts --password "securepassword123"
-```
-Example output:
+### **Example Output**
 ```
 New Ethereum account created!
-Address: 0x01a21f71e5937759f08e72cF2FD99C5Ca14E55b3
-Keystore File Path: /Users/USER/onramp-contracts/UTC--2025-02-08T01-38-38.942688000Z--01a21f71e5937759f08e72cf2fd99c5ca14e55b3
+Address: 0x123456789abcdef...
+Keystore File Path: /home/user/onramp-contracts/xchain_key.json
 ```
 
-Set environment variables:
+🔹 This saves the keystore file **at the exact location specified**.
+🔹 The file is **password-protected** and should be stored securely.
+
+---
+
+## 🏃‍♂️ Running the Daemon
+
+To start the Xchain adapter daemon, run:
+
 ```sh
-export XCHAIN_KEY_PATH=~/onramp-contracts/xchain_key.json/UTC--2024-10-01T21-31-48.090887441Z--your-address
-export XCHAIN_PASSPHRASE=password
-export XCHAIN_ETH_API="http://127.0.0.1:1234/rpc/v1"
-export MINER_ADDRESS=t01013
+xchain daemon --config ./config/config.json --buffer-service --aggregation-service
 ```
 
 ---
 
-## **🚀 Running XChain**
-Set environment variables as above, then:
+## 📡 **Submitting an Offer**
+
+To submit an offer to the OnRamp contract:
+
 ```sh
-./contract-tools/xchain/xchain_server
+xchain client offer <commP> <size> <cid> <bufferLocation> <token-hex> <token-amount>
 ```
-Use the XChain client to upload data:
+
+Example:
 ```sh
-./contract-tools/client.bash screenshot.png 0xaEE9C9E8E4b40665338BD8374D8D473Bd014D1A1 1
+xchain client offer bafkreihdwdcef4n... 128 /data/file1 /buffers/ 0x6B175474E89094C44Da98b954EedeAC495271d0F 1000
 ```
 
 ---
 
-## **🔍 Additional Notes & References**
-- [Shashank's Guide](https://gist.github.com/lordshashank/fb2fbd53b5520a862bd451e3603b4718)
-- [Filecoin Deals Repo](https://github.com/lordshashank/filecoin-deals)
+## 🔍 **Checking Deal Status**
+
+To check the deal status for a CID:
+
+```sh
+xchain client dealStatus <cid> <offerId>
+```
+
+Example:
+```sh
+xchain client dealStatus bafkreihdwdcef4n 42
+```
+
+---
+
+## 📖 **Additional Notes**
+- **Keep your `config.json` file secure** since it contains sensitive information like private key paths and authentication tokens.
+- **Use strong passwords** when generating Ethereum accounts.
+- **Regularly back up keystore files** to avoid losing access to funds.
+
+---
+
+## 💡 **Troubleshooting**
+### Error: "config.json not found"
+Ensure the config file is correctly placed in the `config/` directory and named `config.json`.
+
+### Error: "invalid keystore file"
+Ensure the keystore file is correctly generated using `generate-account` and that you are using the correct password.
+
+### Error: "failed to connect to API"
+Check that your `Api` field in `config.json` is correctly set to a working Ethereum/Web3 provider.
+
+---
+
+## 🤝 **Contributing**
+We welcome contributions! Feel free to submit pull requests or open issues.
+
+---
+
+## 📜 **License**
+This project is licensed under the MIT License.
