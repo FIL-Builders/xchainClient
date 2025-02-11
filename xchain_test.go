@@ -33,13 +33,13 @@ func TestChainIdEncoding(t *testing.T) {
 	// Connect to the Ethereum client
 	client, err := ethclient.Dial(srcCfg.Api)
 	if err != nil {
-		t.Fatalf("failed to connect to the Ethereum client on %s: %v", srcCfg.Api, err)
+		t.Fatalf("failed to connect to Ethereum client for source chain %s at %s: %v", chainName, srcCfg.Api, err)
 	}
 
 	// Query the chain ID
 	chainID, err := client.ChainID(context.Background())
 	if err != nil {
-		t.Fatalf("failed to query %s to get chain ID: %v", srcCfg.Api, err)
+		t.Fatalf("failed to query source chain %s at %s to get chain ID: %v", chainName, srcCfg.Api, err)
 	}
 
 	// Encode the chainID
