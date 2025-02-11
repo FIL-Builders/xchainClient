@@ -6,6 +6,7 @@ require (
 	github.com/ethereum/go-ethereum v1.14.3
 	github.com/filecoin-project/boost v1.7.5
 	github.com/filecoin-project/go-address v1.1.0
+	github.com/filecoin-project/go-cbor-util v0.0.1
 	github.com/filecoin-project/go-data-segment v0.0.1
 	github.com/filecoin-project/go-jsonrpc v0.5.0
 	github.com/filecoin-project/go-state-types v0.13.3
@@ -15,6 +16,7 @@ require (
 	github.com/libp2p/go-libp2p v0.35.1
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/multiformats/go-multiaddr v0.12.4
+	github.com/stretchr/testify v1.9.0
 	github.com/urfave/cli/v2 v2.27.2
 	golang.org/x/sync v0.7.0
 
@@ -54,7 +56,6 @@ require (
 	github.com/filecoin-project/go-amt-ipld/v3 v3.1.0 // indirect
 	github.com/filecoin-project/go-amt-ipld/v4 v4.3.0 // indirect
 	github.com/filecoin-project/go-bitfield v0.2.4 // indirect
-	github.com/filecoin-project/go-cbor-util v0.0.1 // indirect
 	github.com/filecoin-project/go-crypto v0.0.2-0.20240424000926-1808e310bbac // indirect
 	github.com/filecoin-project/go-data-transfer v1.15.4-boost // indirect
 	github.com/filecoin-project/go-data-transfer/v2 v2.0.0-rc8 // indirect
@@ -194,7 +195,6 @@ require (
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
 	github.com/shirou/gopsutil v3.21.4-0.20210419000835-c7a38de76ee5+incompatible // indirect
 	github.com/spaolacci/murmur3 v1.1.0 // indirect
-	github.com/stretchr/testify v1.9.0 // indirect
 	github.com/supranational/blst v0.3.11 // indirect
 	github.com/tklauser/go-sysconf v0.3.12 // indirect
 	github.com/tklauser/numcpus v0.6.1 // indirect

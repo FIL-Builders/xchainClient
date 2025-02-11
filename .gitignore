@@ -27,4 +27,4 @@ go.work.sum
 
 
 # config
-./config/xchain_key.json
+config/xchain_key.json
