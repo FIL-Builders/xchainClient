@@ -193,7 +193,7 @@ func main() {
 							// Dial network
 							client, err := ethclient.Dial(srcCfg.Api)
 							if err != nil {
-								log.Fatal(err)
+								log.Fatalf("failed to connect to Ethereum client for source chain %s at %s: %v", chainName, srcCfg.Api, err)
 							}
 
 							// Load onramp contract handle
@@ -302,7 +302,7 @@ func main() {
 							// Dial network
 							client, err := ethclient.Dial(srcCfg.Api)
 							if err != nil {
-								log.Fatal(err)
+								log.Fatalf("failed to connect to Ethereum client for source chain %s at %s: %v", chainName, srcCfg.Api, err)
 							}
 
 							// Load onramp contract handle
@@ -484,7 +484,7 @@ func NewLotusDaemonAPIClientV0(ctx context.Context, url string, timeoutSecs int,
 func NewAggregator(ctx context.Context, cfg *config.Config, srcCfg *config.SourceChainConfig) (*aggregator, error) {
 	client, err := ethclient.Dial(srcCfg.Api)
 	if err != nil {
-		log.Fatal(err)
+		return nil, fmt.Errorf("failed to connect to Ethereum client for source chain at %s: %w", srcCfg.Api, err)
 	}
 
 	parsedABI, err := LoadAbi(cfg.OnRampABIPath)
@@ -508,7 +508,7 @@ func NewAggregator(ctx context.Context, cfg *config.Config, srcCfg *config.Sourc
 
 	lAPI, closer, err := NewLotusDaemonAPIClientV0(ctx, cfg.Destination.LotusAPI, 1, "")
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to connect to the Ethereum client on the destination chain: using url %s: %v", cfg.Destination.LotusAPI, err)
 	}
 
 	// Get maddr for dialing boost from on chain miner actor
