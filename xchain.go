@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"context"
 	"encoding/hex"
+	"path/filepath"
+
 	"encoding/json"
 	"fmt"
 	"io"
@@ -58,18 +60,16 @@ func main() {
 		Name:        "xchain",
 		Description: "Filecoin Xchain Data Services",
 		Usage:       "Export filecoin data storage to any blockchain",
-		Flags: []cli.Flag{
-			&cli.StringFlag{
-				Name:  "config",
-				Usage: "Path to the configuration file",
-				Value: "./config/config.json",
-			},
-		},
 		Commands: []*cli.Command{
 			{
 				Name:  "daemon",
 				Usage: "Start the xchain adapter daemon",
 				Flags: []cli.Flag{
+					&cli.StringFlag{
+						Name:  "config",
+						Usage: "Path to the configuration file",
+						Value: "./config/config.json",
+					},
 					&cli.BoolFlag{
 						Name:  "buffer-service",
 						Usage: "Run a buffer server",
@@ -151,6 +151,13 @@ func main() {
 						Name:      "offer",
 						Usage:     "Offer data by providing file and payment parameters",
 						ArgsUsage: "<commP> <size> <cid> <bufferLocation> <token-hex> <token-amount>",
+						Flags: []cli.Flag{
+							&cli.StringFlag{
+								Name:  "config",
+								Usage: "Path to the configuration file",
+								Value: "./config/config.json",
+							},
+						},
 						Action: func(cctx *cli.Context) error {
 							cfg, err := LoadConfig(cctx.String("config"))
 							if err != nil {
@@ -214,6 +221,13 @@ func main() {
 						Name:      "dealStatus",
 						Usage:     "Check deal status for a specific CID",
 						ArgsUsage: "<cid> <offerId>",
+						Flags: []cli.Flag{
+							&cli.StringFlag{
+								Name:  "config",
+								Usage: "Path to the configuration file",
+								Value: "./config/config.json",
+							},
+						},
 						Action: func(cctx *cli.Context) error {
 							cfg, err := LoadConfig(cctx.String("config"))
 							if err != nil {
@@ -291,6 +305,39 @@ func main() {
 							return nil
 						},
 					},
+				},
+			},
+			{
+				Name:  "generate-account",
+				Usage: "Generate a new Ethereum keystore account",
+				Flags: []cli.Flag{
+					&cli.StringFlag{
+						Name:     "keystore-file",
+						Usage:    "Path to the keystore JSON file (must end in .json)",
+						Required: true,
+					},
+					&cli.StringFlag{
+						Name:     "password",
+						Usage:    "Password to encrypt the keystore file",
+						Required: true,
+					},
+				},
+				Action: func(cctx *cli.Context) error {
+					keystoreFile := cctx.String("keystore-file")
+					password := cctx.String("password")
+
+					// Validate and create keystore
+					accountAddress, err := generateEthereumAccount(keystoreFile, password)
+					if err != nil {
+						log.Fatalf("Error generating account: %v", err)
+					}
+
+					// Output generated account info
+					fmt.Println("New Ethereum account created!")
+					fmt.Println("Address:", accountAddress)
+					fmt.Println("Keystore File Path:", keystoreFile)
+
+					return nil
 				},
 			},
 		},
@@ -1197,4 +1244,46 @@ func encodeChainID(chainID *big.Int) ([]byte, error) {
 	}
 
 	return data, nil
+}
+
+// generateEthereumAccount creates a new Ethereum account and saves it to the specified JSON file
+func generateEthereumAccount(keystoreFile, password string) (string, error) {
+	// Validate file extension
+	if filepath.Ext(keystoreFile) != ".json" {
+		return "", fmt.Errorf("keystore file must have a .json extension")
+	}
+
+	// Ensure directory exists
+	keystoreDir := filepath.Dir(keystoreFile)
+	if err := os.MkdirAll(keystoreDir, 0700); err != nil {
+		return "", fmt.Errorf("failed to create keystore directory: %v", err)
+	}
+
+	// Create a temporary keystore
+	tempDir, err := os.MkdirTemp("", "keystore-tmp")
+	if err != nil {
+		return "", fmt.Errorf("failed to create temporary keystore directory: %v", err)
+	}
+	defer os.RemoveAll(tempDir) // Cleanup temp keystore
+
+	ks := keystore.NewKeyStore(tempDir, keystore.StandardScryptN, keystore.StandardScryptP)
+
+	// Generate a new account
+	account, err := ks.NewAccount(password)
+	if err != nil {
+		return "", fmt.Errorf("failed to create new account: %v", err)
+	}
+
+	// Read the generated keystore file
+	keyJSON, err := os.ReadFile(account.URL.Path)
+	if err != nil {
+		return "", fmt.Errorf("failed to read generated keystore file: %v", err)
+	}
+
+	// Save to the specified file path
+	if err := os.WriteFile(keystoreFile, keyJSON, 0600); err != nil {
+		return "", fmt.Errorf("failed to save keystore file: %v", err)
+	}
+
+	return account.Address.Hex(), nil
 }
