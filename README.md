@@ -6,7 +6,7 @@ Xchain Client provides a set of tools to facilitate cross-chain data movement fr
 
 ## 🚀 Installation
 
-Ensure you have **Go 1.18+** installed. Then, clone the repository and build the project:
+Ensure you have **Go** installed. Then, clone the repository and build the project:
 
 ```sh
 git clone https://github.com/your-repo/xchainClient.git
