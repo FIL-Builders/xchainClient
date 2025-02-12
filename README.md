@@ -19,7 +19,7 @@ go build -o xchainClient
 1. Create a `.env` file to store your **XCHAIN_PASSPHRASE** (used for unlocking the Ethereum keystore):
 
 ```sh
-echo "XCHAIN_PASSPHRASE=your_secure_password" > .env
+echo "export XCHAIN_PASSPHRASE=your_secure_password" > .env
 ```
 
 2. **Source the file** to load the variable into your environment:
