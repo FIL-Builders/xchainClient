@@ -135,7 +135,7 @@ The Xchain Client now **uses a `config.json` file** for storing settings instead
     "ProviderAddr": "t0116147",
     "LotusAPI": "https://api.calibration.node.glif.io",
     "LighthouseApiKey": "",
-    "LighthouseAuth": "u8t8gf6ds06re"
+    "LighthouseAuth": ""
   }
 ]
 ```
