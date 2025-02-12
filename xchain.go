@@ -217,94 +217,6 @@ func main() {
 							return nil
 						},
 					},
-					{
-						Name:      "dealStatus",
-						Usage:     "Check deal status for a specific CID",
-						ArgsUsage: "<cid> <offerId>",
-						Flags: []cli.Flag{
-							&cli.StringFlag{
-								Name:  "config",
-								Usage: "Path to the configuration file",
-								Value: "./config/config.json",
-							},
-						},
-						Action: func(cctx *cli.Context) error {
-							cfg, err := LoadConfig(cctx.String("config"))
-							if err != nil {
-								log.Fatal(err)
-							}
-
-							cidString := cctx.Args().First()
-							if cidString == "" {
-								log.Printf("Please provide a CID to check deal status")
-								return nil
-							}
-
-							offerId := cctx.Args().Get(1)
-							if offerId == "" {
-								log.Printf("Please provide offerID to check deal status")
-								return nil
-							}
-
-							//Request deal status from Lighthouse Deal Engine
-							log.Println("Start checking deal status and process aggregation for CID", cidString)
-							proofResponse, err := getDealStatus(cidString, cfg.LighthouseAuth)
-							if err != nil {
-								log.Fatalf("Error in GET request: %v", err)
-							}
-							commP, proofSubtree, err := ExtractProofDetail(proofResponse.Proof)
-							if err != nil {
-								fmt.Println("Error:", err)
-								return nil
-							}
-							log.Println("offer ID is ", offerId)
-							log.Println("commP is ", commP)
-							log.Println("proofSubtree is ", proofSubtree)
-
-							// Dial network
-							client, err := ethclient.Dial(cfg.Api)
-							if err != nil {
-								log.Fatal(err)
-							}
-
-							// Load onramp contract handle
-							contractAddress := common.HexToAddress(cfg.OnRampAddress)
-							parsedABI, err := LoadAbi(cfg.OnRampABIPath)
-							if err != nil {
-								log.Fatal(err)
-							}
-
-							onramp := bind.NewBoundContract(contractAddress, *parsedABI, client, client, client)
-							if err != nil {
-								log.Fatal(err)
-							}
-
-							// Get auth
-							auth, err := loadPrivateKey(cfg)
-							if err != nil {
-								log.Fatal(err)
-							}
-
-							inclProofs := make([]merkletree.ProofData, 1)
-							ids := make([]uint64, 1)
-							ids[0] = 42
-							inclProofs[0] = proofSubtree
-
-							tx, err := onramp.Transact(auth, "commitAggregate", commP.Bytes(), ids, inclProofs, common.HexToAddress(cfg.PayoutAddr))
-							if err != nil {
-								return err
-							}
-
-							log.Printf("Waiting for transaction: %s\n", tx.Hash().Hex())
-							receipt, err := bind.WaitMined(cctx.Context, client, tx)
-							if err != nil {
-								log.Fatalf("failed to wait for tx: %v", err)
-							}
-							log.Printf("Tx %s committing aggregate commp %s included: %d", tx.Hash().Hex(), commP.String(), receipt.Status)
-
-							return nil
-						},
-					},
 				},
 			},
 			{
@@ -575,15 +487,10 @@ func (a *aggregator) run(ctx context.Context) error {
 		return err
 	})
 
-	// Start Lighthouse Deal Engine listener
-	g.Go(func() error {
-		return a.sendingToLighthouseDe(ctx)
-	})
-
 	// Start aggregatation event handling
-	// g.Go(func() error {
-	// 	return a.runAggregate(ctx)
-	// })
+	g.Go(func() error {
+		return a.runAggregate(ctx)
+	})
 
 	// Start handling data transfer requests
 	g.Go(func() error {
@@ -629,43 +536,6 @@ const (
 	// Storage deal duration, TODO figure out what to do about this, either comes from offer or config
 	dealDuration = 518400 // 6 months (on mainnet)
 )
-
-// No aggregation required, just sending cid to Lighthouse Deal Engine.
-func (a *aggregator) sendingToLighthouseDe(ctx context.Context) error {
-	log.Println("Sending files to Lighthouse Deal Engine.")
-	log.Println("Events count = ", len(a.ch))
-
-	for {
-		select {
-		case <-ctx.Done():
-			log.Printf("ctx done shutting down Lighthouse Event Listener")
-			return nil
-		case latestEvent := <-a.ch:
-			log.Println("Processing Offer ", latestEvent.OfferID)
-			log.Println("Offer CID ", latestEvent.Offer.Cid)
-
-			// Check if the offer is too big to fit in a valid aggregate on its own
-			sendToLighthouseDE(latestEvent.Offer.Cid, a.LighthouseAuth)
-		}
-	}
-}
-
-// Request Deal Status from Lighthouse Engine and send PoDSI to onramp contract
-func processDealStatus(ctx context.Context, cfg *Config, cid string) error {
-	//Request deal status from Lighthouse Deal Engine
-	proofResponse, err := getDealStatus(cid, cfg.LighthouseAuth)
-	if err != nil {
-		log.Fatalf("Error in GET request: %v", err)
-	}
-	// Print or log the response body
-	log.Printf("PoDSI Proof: %s", proofResponse.Proof)
-	log.Printf("Filecoin Deal: %s", proofResponse.FilecoinDeals)
-
-	// Log the end of the process
-	log.Println("Process completed successfully.")
-
-	return nil
-}
 
 func (a *aggregator) runAggregate(ctx context.Context) error {
 	// pieces being aggregated, flushed upon commitment
