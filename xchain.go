@@ -159,10 +159,28 @@ func main() {
 			},
 			{
 				Name:  "client",
-				Usage: "Send data from cross chain to filecoin",
+				Usage: "Send car file from cross chain to filecoin",
 				Subcommands: []*cli.Command{
 					{
-						Name:      "offer",
+						Name:      "offer-file",
+						Usage:     "Offer data by providing a file and payment parameters (file is pre-processed automatically)",
+						ArgsUsage: "<file_path> <payment-addr> <payment-amount>",
+						Flags: []cli.Flag{
+							&cli.StringFlag{
+								Name:  "config",
+								Usage: "Path to the configuration file",
+								Value: "./config/config.json",
+							},
+							&cli.StringFlag{
+								Name:     "chain",
+								Usage:    "Name of the source blockchain (e.g., ethereum, polygon)",
+								Required: true,
+							},
+						},
+						Action: offerFileAction,
+					},
+					{
+						Name:      "offer-car",
 						Usage:     "Offer data by providing file and payment parameters",
 						ArgsUsage: "<commP> <size> <cid> <bufferLocation> <token-hex> <token-amount>",
 						Flags: []cli.Flag{

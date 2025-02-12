@@ -11,7 +11,7 @@
     },
     "avalanche": {
       "Api": "wss://api.avax-test.network/ext/bc/C/ws",
-      "OnRampAddress": "0x123...abc"
+      "OnRampAddress": "0x29E81A673915d5f099289e0cba31c49072710d01"
     },
     "polygon": {
       "Api": "wss://polygon-rpc.com",
