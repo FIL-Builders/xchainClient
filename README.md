@@ -17,12 +17,11 @@ go build -o xchainClient
 
 ## 📌 Configure Environment Variables
 1. Create a `.env` file to store your **XCHAIN_PASSPHRASE** (used for unlocking the Ethereum keystore):
+    ```sh
+    echo "export XCHAIN_PASSPHRASE=your_secure_password" > .env
+    ```
 
-```sh
-echo "export XCHAIN_PASSPHRASE=your_secure_password" > .env
-```
-
-2. **Source the file** to load the variable into your environment:
+2. **Source the file** to load the variable into your environment before you run any xchainClient commands:
    ```sh
    source .env
    ```
@@ -48,17 +47,20 @@ Address: 0x123456789abcdef...
 Keystore File Path: /home/user/onramp-contracts/xchain_key.json
 ```
 
-🔹 This saves the keystore file **at the exact location specified**.
-🔹 The file is **password-protected** and should be stored securely.
+🔹 This saves the keystore file **at the exact location specified**. The file is **password-protected** and should be stored securely.
+
+🔹 To run xChainClient for a specific chain, you need to request some test token to this wallet address from that chain. 
 
 ---
 
 ## 🏃‍♂️ Running the Daemon
 
+Once you have finisehd the above process and sucessfully deployed [onramp contracts](https://github.com/FIL-Builders/onramp-contracts) to the source chain and Filecoin. You should update the `config.json` with the correct information.
+
 To start the Xchain adapter daemon, run:
 
 ```sh
-./xchainClient --config ./config/config.json daemon --buffer-service --aggregation-service
+./xchainClient daemon --config ./config/config.json --chain avalanche --buffer-service --aggregation-service
 ```
 
 ---
@@ -73,13 +75,13 @@ the `offer-file` command simplifies offering data by automatically:
 4. submitting an offer transaction to the blockchain.
 
 ```sh
-./xchainclient client offer-file <file_path> <payment-addr> <payment-amount> --chain ethereum --config ./config/config.json
+./xchainclient client offer-file --chain avalanche --config ./config/config.json <file_path> <payment-addr> <payment-amount>
 ```
 
 example:
 
 ```sh
-./xchainclient client offer-file ./data/sample.txt 0x5c31e78f3f7329769734f5ff1ac7e22c243e817e 1000 --chain polygon
+./xchainclient client offer-file --chain avalanche ./data/sample.txt 0x5c31e78f3f7329769734f5ff1ac7e22c243e817e 1000
 ```
 
 ---
@@ -169,7 +171,7 @@ The Xchain Client uses a `config.json` file to store its settings. The configura
   "BufferPort": 5077,
   "ProviderAddr": "t0116147",
   "LighthouseApiKey": "",
-  "LighthouseAuth": "u8t8gf6ds06re",
+  "LighthouseAuth": "",
   "TransferIP": "0.0.0.0",
   "TransferPort": 9999,
   "TargetAggSize": 0
