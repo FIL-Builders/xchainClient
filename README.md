@@ -169,7 +169,7 @@ The Xchain Client uses a `config.json` file to store its settings. The configura
   "BufferPort": 5077,
   "ProviderAddr": "t0116147",
   "LighthouseApiKey": "",
-  "LighthouseAuth": "u8t8gf6ds06re",
+  "LighthouseAuth": "",
   "TransferIP": "0.0.0.0",
   "TransferPort": 9999,
   "TargetAggSize": 0

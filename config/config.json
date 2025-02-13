@@ -26,7 +26,7 @@
   "BufferPort": 5077,
   "ProviderAddr": "t0116147",
   "LighthouseApiKey": "",
-  "LighthouseAuth": "u8t8gf6ds06re",
+  "LighthouseAuth": "",
   "TransferIP": "0.0.0.0",
   "TransferPort": 9999,
   "TargetAggSize": 0
