@@ -1,6 +1,8 @@
 package main
 
 import (
+	"github.com/FIL-Builders/xchainClient/config"
+
 	"bytes"
 	"context"
 	"encoding/hex"
@@ -71,6 +73,11 @@ func main() {
 						Usage: "Path to the configuration file",
 						Value: "./config/config.json",
 					},
+					&cli.StringFlag{
+						Name:     "chain",
+						Usage:    "Name of the source blockchain (e.g., ethereum, polygon)",
+						Required: true,
+					},
 					&cli.BoolFlag{
 						Name:  "buffer-service",
 						Usage: "Run a buffer server",
@@ -89,9 +96,16 @@ func main() {
 						isAgg = true
 					}
 
-					cfg, err := LoadConfig(cctx.String("config"))
+					cfg, err := config.LoadConfig(cctx.String("config"))
 					if err != nil {
 						log.Fatal(err)
+					}
+
+					// Get source chain name
+					chainName := cctx.String("chain")
+					srcCfg, err := config.GetSourceConfig(cfg, chainName)
+					if err != nil {
+						log.Fatalf("Invalid chain name '%s': %v", chainName, err)
 					}
 
 					g, ctx := errgroup.WithContext(cctx.Context)
@@ -135,7 +149,7 @@ func main() {
 						if !isAgg {
 							return nil
 						}
-						a, err := NewAggregator(ctx, cfg)
+						a, err := NewAggregator(ctx, cfg, srcCfg)
 						if err != nil {
 							return err
 						}
@@ -146,10 +160,28 @@ func main() {
 			},
 			{
 				Name:  "client",
-				Usage: "Send data from cross chain to filecoin",
+				Usage: "Send car file from cross chain to filecoin",
 				Subcommands: []*cli.Command{
 					{
-						Name:      "offer",
+						Name:      "offer-file",
+						Usage:     "Offer data by providing a file and payment parameters (file is pre-processed automatically)",
+						ArgsUsage: "<file_path> <payment-addr> <payment-amount>",
+						Flags: []cli.Flag{
+							&cli.StringFlag{
+								Name:  "config",
+								Usage: "Path to the configuration file",
+								Value: "./config/config.json",
+							},
+							&cli.StringFlag{
+								Name:     "chain",
+								Usage:    "Name of the source blockchain (e.g., ethereum, polygon)",
+								Required: true,
+							},
+						},
+						Action: offerFileAction,
+					},
+					{
+						Name:      "offer-car",
 						Usage:     "Offer data by providing file and payment parameters",
 						ArgsUsage: "<commP> <size> <cid> <bufferLocation> <token-hex> <token-amount>",
 						Flags: []cli.Flag{
@@ -158,21 +190,33 @@ func main() {
 								Usage: "Path to the configuration file",
 								Value: "./config/config.json",
 							},
+							&cli.StringFlag{
+								Name:     "chain",
+								Usage:    "Name of the source blockchain (e.g., ethereum, polygon)",
+								Required: true,
+							},
 						},
 						Action: func(cctx *cli.Context) error {
-							cfg, err := LoadConfig(cctx.String("config"))
+							cfg, err := config.LoadConfig(cctx.String("config"))
 							if err != nil {
 								log.Fatal(err)
+							}
+
+							// Get chain name
+							chainName := cctx.String("chain")
+							srcCfg, err := config.GetSourceConfig(cfg, chainName)
+							if err != nil {
+								log.Fatalf("Invalid chain name '%s': %v", chainName, err)
 							}
 
 							// Dial network
-							client, err := ethclient.Dial(cfg.Api)
+							client, err := ethclient.Dial(srcCfg.Api)
 							if err != nil {
-								log.Fatal(err)
+								log.Fatalf("failed to connect to Ethereum client for source chain %s at %s: %v", chainName, srcCfg.Api, err)
 							}
 
 							// Load onramp contract handle
-							contractAddress := common.HexToAddress(cfg.OnRampAddress)
+							contractAddress := common.HexToAddress(srcCfg.OnRampAddress)
 							parsedABI, err := LoadAbi(cfg.OnRampABIPath)
 							if err != nil {
 								log.Fatal(err)
@@ -228,9 +272,14 @@ func main() {
 								Usage: "Path to the configuration file",
 								Value: "./config/config.json",
 							},
+							&cli.StringFlag{
+								Name:     "chain",
+								Usage:    "Name of the source blockchain (e.g., ethereum, polygon)",
+								Required: true,
+							},
 						},
 						Action: func(cctx *cli.Context) error {
-							cfg, err := LoadConfig(cctx.String("config"))
+							cfg, err := config.LoadConfig(cctx.String("config"))
 							if err != nil {
 								log.Fatal(err)
 							}
@@ -245,6 +294,13 @@ func main() {
 							if offerId == "" {
 								log.Printf("Please provide offerID to check deal status")
 								return nil
+							}
+
+							// Get chain name
+							chainName := cctx.String("chain")
+							srcCfg, err := config.GetSourceConfig(cfg, chainName)
+							if err != nil {
+								log.Fatalf("Invalid chain name '%s': %v", chainName, err)
 							}
 
 							//Request deal status from Lighthouse Deal Engine
@@ -263,13 +319,13 @@ func main() {
 							log.Println("proofSubtree is ", proofSubtree)
 
 							// Dial network
-							client, err := ethclient.Dial(cfg.Api)
+							client, err := ethclient.Dial(srcCfg.Api)
 							if err != nil {
-								log.Fatal(err)
+								log.Fatalf("failed to connect to Ethereum client for source chain %s at %s: %v", chainName, srcCfg.Api, err)
 							}
 
 							// Load onramp contract handle
-							contractAddress := common.HexToAddress(cfg.OnRampAddress)
+							contractAddress := common.HexToAddress(srcCfg.OnRampAddress)
 							parsedABI, err := LoadAbi(cfg.OnRampABIPath)
 							if err != nil {
 								log.Fatal(err)
@@ -355,25 +411,6 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-}
-
-type Config struct {
-	ChainID        int
-	Api            string
-	OnRampAddress  string
-	ProverAddr     string
-	KeyPath        string
-	ClientAddr     string
-	PayoutAddr     string
-	OnRampABIPath  string
-	BufferPath     string
-	BufferPort     int
-	TransferIP     string
-	TransferPort   int
-	ProviderAddr   string
-	LotusAPI       string
-	TargetAggSize  int
-	LighthouseAuth string
 }
 
 // Mirror OnRamp.sol's `Offer` struct
@@ -463,18 +500,18 @@ func NewLotusDaemonAPIClientV0(ctx context.Context, url string, timeoutSecs int,
 	return c, closer, nil
 }
 
-func NewAggregator(ctx context.Context, cfg *Config) (*aggregator, error) {
-	client, err := ethclient.Dial(cfg.Api)
+func NewAggregator(ctx context.Context, cfg *config.Config, srcCfg *config.SourceChainConfig) (*aggregator, error) {
+	client, err := ethclient.Dial(srcCfg.Api)
 	if err != nil {
-		log.Fatal(err)
+		return nil, fmt.Errorf("failed to connect to Ethereum client for source chain at %s: %w", srcCfg.Api, err)
 	}
 
 	parsedABI, err := LoadAbi(cfg.OnRampABIPath)
 	if err != nil {
 		return nil, err
 	}
-	proverContractAddress := common.HexToAddress(cfg.ProverAddr)
-	onRampContractAddress := common.HexToAddress(cfg.OnRampAddress)
+	proverContractAddress := common.HexToAddress(cfg.Destination.ProverAddr)
+	onRampContractAddress := common.HexToAddress(srcCfg.OnRampAddress)
 	payoutAddress := common.HexToAddress(cfg.PayoutAddr)
 	onramp := bind.NewBoundContract(onRampContractAddress, *parsedABI, client, client, client)
 
@@ -488,9 +525,9 @@ func NewAggregator(ctx context.Context, cfg *Config) (*aggregator, error) {
 		return nil, err
 	}
 
-	lAPI, closer, err := NewLotusDaemonAPIClientV0(ctx, cfg.LotusAPI, 1, "")
+	lAPI, closer, err := NewLotusDaemonAPIClientV0(ctx, cfg.Destination.LotusAPI, 1, "")
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to connect to the Ethereum client on the destination chain: using url %s: %v", cfg.Destination.LotusAPI, err)
 	}
 
 	// Get maddr for dialing boost from on chain miner actor
@@ -652,15 +689,15 @@ func (a *aggregator) sendingToLighthouseDe(ctx context.Context) error {
 }
 
 // Request Deal Status from Lighthouse Engine and send PoDSI to onramp contract
-func processDealStatus(ctx context.Context, cfg *Config, cid string) error {
+func processDealStatus(ctx context.Context, cfg *config.Config, cid string) error {
 	//Request deal status from Lighthouse Deal Engine
 	proofResponse, err := getDealStatus(cid, cfg.LighthouseAuth)
 	if err != nil {
 		log.Fatalf("Error in GET request: %v", err)
 	}
 	// Print or log the response body
-	log.Printf("PoDSI Proof: %s", proofResponse.Proof)
-	log.Printf("Filecoin Deal: %s", proofResponse.FilecoinDeals)
+	log.Printf("PoDSI Proof: %v", proofResponse.Proof)
+	log.Printf("Filecoin Deal: %v", proofResponse.FilecoinDeals)
 
 	// Log the end of the process
 	log.Println("Process completed successfully.")
@@ -1144,38 +1181,9 @@ func MakeOffer(commpStr string, sizeStr string, cidStr string, location string, 
 	return &offer, nil
 }
 
-// Load Config given path to JSON config file
-func LoadConfig(path string) (*Config, error) {
-	path, err := homedir.Expand(path)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get absolute path: %w", err)
-	}
-
-	file, err := os.Open(path)
-	if err != nil {
-		return nil, fmt.Errorf("failed to open config file: %w", err)
-	}
-	defer file.Close()
-
-	bs, err := io.ReadAll(file)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read config bytes from file: %w", err)
-	}
-	var cfg []Config
-
-	err = json.Unmarshal(bs, &cfg)
-	if err != nil {
-		return nil, fmt.Errorf("failed to decode config file: %v", err)
-	}
-	if len(cfg) != 1 {
-		return nil, fmt.Errorf("expected 1 config, got %d", len(cfg))
-	}
-	return &cfg[0], nil
-}
-
 // Load and unlock the keystore with XCHAIN_PASSPHRASE env var
 // return a transaction authorizer
-func loadPrivateKey(cfg *Config) (*bind.TransactOpts, error) {
+func loadPrivateKey(cfg *config.Config) (*bind.TransactOpts, error) {
 	path, err := homedir.Expand(cfg.KeyPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get absolute path: %w", err)
@@ -1212,7 +1220,7 @@ func loadPrivateKey(cfg *Config) (*bind.TransactOpts, error) {
 		return nil, fmt.Errorf("failed to unlock keystore: %w", err)
 	}
 
-	return bind.NewKeyStoreTransactorWithChainID(ks, a, big.NewInt(int64(cfg.ChainID)))
+	return bind.NewKeyStoreTransactorWithChainID(ks, a, big.NewInt(int64(cfg.Destination.ChainID)))
 }
 
 // Load contract abi at the given path

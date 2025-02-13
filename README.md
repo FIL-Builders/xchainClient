@@ -6,7 +6,7 @@ Xchain Client provides a set of tools to facilitate cross-chain data movement fr
 
 ## 🚀 Installation
 
-Ensure you have **Go 1.18+** installed. Then, clone the repository and build the project:
+Ensure you have **Go** installed. Then, clone the repository and build the project:
 
 ```sh
 git clone https://github.com/your-repo/xchainClient.git
@@ -58,22 +58,44 @@ Keystore File Path: /home/user/onramp-contracts/xchain_key.json
 To start the Xchain adapter daemon, run:
 
 ```sh
-./xchainClient daemon --config ./config/config.json --buffer-service --aggregation-service
+./xchainClient --config ./config/config.json daemon --buffer-service --aggregation-service
 ```
 
 ---
 
-## 📡 **Submitting an Offer**
+## 📡 **offering data with automatic car processing**
 
-To submit an offer to the OnRamp contract:
+the `offer-file` command simplifies offering data by automatically:
+
+1. converting the file into a car format.
+2. calculating the commp (content identifier for proofs).
+3. uploading the car file to a local buffer service.
+4. submitting an offer transaction to the blockchain.
 
 ```sh
-./xchainClient client offer <commP> <size> <cid> <bufferLocation> <token-hex> <token-amount>
+./xchainclient client offer-file <file_path> <payment-addr> <payment-amount> --chain ethereum --config ./config/config.json
 ```
 
-Example:
+example:
+
 ```sh
-./xchainClient client offer bafkreihdwdcef4n... 128 /data/file1 /buffers/ 0x6B175474E89094C44Da98b954EedeAC495271d0F 1000
+./xchainclient client offer-file ./data/sample.txt 0x5c31e78f3f7329769734f5ff1ac7e22c243e817e 1000 --chain polygon
+```
+
+---
+
+## 📡 **submitting an offer (manual method)**
+
+to submit an offer to the onramp contract manually:
+
+```sh
+./xchainclient client offer <commp> <size> <cid> <bufferlocation> <token-hex> <token-amount>
+```
+
+example:
+
+```sh
+./xchainclient client offer bafkreihdwdcef4n... 128 /data/file1 /buffers/ 0x6b175474e89094c44da98b954eedeac495271d0f 1000
 ```
 
 ---
@@ -111,42 +133,61 @@ Ensure the keystore file is correctly generated using `generate-account` and tha
 Check that your `Api` field in `config.json` is correctly set to a working Ethereum/Web3 provider.
 
 ---
-
 ## 🛠️ Configuration
 
 ### **Config File (`config.json`)**
 
-The Xchain Client now **uses a `config.json` file** for storing settings instead of a `.env` file. The configuration file should be placed inside the `config/` directory.
+The Xchain Client uses a `config.json` file to store its settings. The configuration file should be placed inside the `config/` directory.
 
 #### **Example `config.json`**
 ```json
-[
-  {
+{
+  "destination": {
     "ChainID": 314159,
-    "Api": "wss://wss.calibration.node.glif.io/apigw/lotus/rpc/v1",
-    "OnRampAddress": "0x750CbAcFbE58C453cEA1E5a2617193D60B7Cb451",
-    "ProverAddr": "0x61F0ACE5ad40466Eb43141fa56Cf87758b6ffbA8",
-    "KeyPath": "./config/xchain_key.json",
-    "ClientAddr": "0x5c31e78f3f7329769734f5ff1ac7e22c243e817e",
-    "PayoutAddr": "0x5c31e78f3f7329769734f5ff1ac7e22c243e817e",
-    "OnRampABIPath": "./config/onramp-abi.json",
-    "BufferPath": "~/.xchain/buffer",
-    "BufferPort": 5077,
-    "ProviderAddr": "t0116147",
     "LotusAPI": "https://api.calibration.node.glif.io",
-    "LighthouseApiKey": "",
-    "LighthouseAuth": ""
-  }
-]
+    "ProverAddr": "0x61F0ACE5ad40466Eb43141fa56Cf87758b6ffbA8"
+  },
+  "sources": {
+    "filecoin": {
+      "Api": "wss://wss.calibration.node.glif.io/apigw/lotus/rpc/v1",
+      "OnRampAddress": "0x750CbAcFbE58C453cEA1E5a2617193D60B7Cb451"
+    },
+    "avalanche": {
+      "Api": "wss://api.avax-test.network/ext/bc/C/ws",
+      "OnRampAddress": "0x123...abc"
+    },
+    "polygon": {
+      "Api": "wss://polygon-rpc.com",
+      "OnRampAddress": "0x456...def"
+    }
+  },
+  "KeyPath": "./config/xchain_key.json",
+  "ClientAddr": "0x5c31e78f3f7329769734f5ff1ac7e22c243e817e",
+  "PayoutAddr": "0x5c31e78f3f7329769734f5ff1ac7e22c243e817e",
+  "OnRampABIPath": "./config/onramp-abi.json",
+  "BufferPath": "~/.xchain/buffer",
+  "BufferPort": 5077,
+  "ProviderAddr": "t0116147",
+  "LighthouseApiKey": "",
+  "LighthouseAuth": "u8t8gf6ds06re",
+  "TransferIP": "0.0.0.0",
+  "TransferPort": 9999,
+  "TargetAggSize": 0
+}
 ```
 
 ### **Configuration Fields Explained**
 | Key | Description |
 |------|------------|
-| **ChainID** | Ethereum-compatible chain ID (e.g., `314159` for Filecoin Calibration Testnet). |
-| **Api** | WebSocket API URL for Ethereum client (e.g., Infura, Glif). |
-| **OnRampAddress** | Address of the OnRamp smart contract. |
-| **ProverAddr** | Ethereum address of the prover for verifying storage deals. |
+| **destination.ChainID** | Ethereum-compatible chain ID for the destination network. |
+| **destination.LotusAPI** | Filecoin Lotus API endpoint used for deal tracking. |
+| **destination.ProverAddr** | Ethereum address of the prover verifying storage deals. |
+| **sources.filecoin.Api** | WebSocket API for Filecoin calibration network. |
+| **sources.filecoin.OnRampAddress** | Filecoin OnRamp contract address. |
+| **sources.avalanche.Api** | WebSocket API for Avalanche network. |
+| **sources.avalanche.OnRampAddress** | Avalanche OnRamp contract address. |
+| **sources.polygon.Api** | WebSocket API for Polygon network. |
+| **sources.polygon.OnRampAddress** | Polygon OnRamp contract address. |
 | **KeyPath** | Path to the keystore file that contains the Ethereum private key. |
 | **ClientAddr** | Ethereum wallet address used for making transactions. |
 | **PayoutAddr** | Address where storage rewards should be sent. |
@@ -154,9 +195,19 @@ The Xchain Client now **uses a `config.json` file** for storing settings instead
 | **BufferPath** | Directory where temporary storage is kept before aggregation. |
 | **BufferPort** | Port for the buffer service (`5077` by default). |
 | **ProviderAddr** | Filecoin storage provider ID. |
-| **LotusAPI** | Filecoin Lotus API endpoint (used for deal tracking). |
 | **LighthouseApiKey** | API key for interacting with Lighthouse storage (if applicable). |
 | **LighthouseAuth** | Authentication token for Lighthouse. |
+| **TransferIP** | IP address for cross-chain data transfer service (`0.0.0.0` for all interfaces). |
+| **TransferPort** | Port for the cross-chain data transfer service (`9999` by default). |
+| **TargetAggSize** | Specifies the aggregation size for deal bundling (currently set to `0`). |
+
+### **Multi-Chain Support**
+Xchain Client supports interaction with multiple blockchains. Users can configure multiple `sources` to enable cross-chain deal submissions. Supported networks include:
+- **Filecoin**
+- **Avalanche**
+- **Polygon**
+
+Each source requires an **API endpoint** and an **OnRamp contract address**, which are specified under the `sources` field in `config.json`.
 
 ---
 

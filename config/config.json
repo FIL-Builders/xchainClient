@@ -1,18 +1,33 @@
-[
-    {
-      "ChainID": 314159,
+{
+  "destination": {
+    "ChainID": 314159,
+    "LotusAPI": "https://api.calibration.node.glif.io",
+    "ProverAddr": "0x61F0ACE5ad40466Eb43141fa56Cf87758b6ffbA8"
+  },
+  "sources": {
+    "filecoin": {
       "Api": "wss://wss.calibration.node.glif.io/apigw/lotus/rpc/v1",
-      "OnRampAddress": "0x750CbAcFbE58C453cEA1E5a2617193D60B7Cb451",
-      "ProverAddr": "0x61F0ACE5ad40466Eb43141fa56Cf87758b6ffbA8",
-      "KeyPath": "./config/xchain_key.json",
-      "ClientAddr": "0x5c31e78f3f7329769734f5ff1ac7e22c243e817e",
-      "PayoutAddr": "0x5c31e78f3f7329769734f5ff1ac7e22c243e817e",
-      "OnRampABIPath": "./config/onramp-abi.json",
-      "BufferPath": "~/.xchain/buffer",
-      "BufferPort": 5077,
-      "ProviderAddr": "t0116147",
-      "LotusAPI": "https://api.calibration.node.glif.io",
-      "LighthouseApiKey": "",
-      "LighthouseAuth": "u8t8gf6ds06re"
+      "OnRampAddress": "0x750CbAcFbE58C453cEA1E5a2617193D60B7Cb451"
+    },
+    "avalanche": {
+      "Api": "wss://api.avax-test.network/ext/bc/C/ws",
+      "OnRampAddress": "0x29E81A673915d5f099289e0cba31c49072710d01"
+    },
+    "polygon": {
+      "Api": "wss://polygon-rpc.com",
+      "OnRampAddress": "0x456...def"
     }
-  ]
+  },
+  "KeyPath": "./config/xchain_key.json",
+  "ClientAddr": "0x5c31e78f3f7329769734f5ff1ac7e22c243e817e",
+  "PayoutAddr": "0x5c31e78f3f7329769734f5ff1ac7e22c243e817e",
+  "OnRampABIPath": "./config/onramp-abi.json",
+  "BufferPath": "~/.xchain/buffer",
+  "BufferPort": 5077,
+  "ProviderAddr": "t0116147",
+  "LighthouseApiKey": "",
+  "LighthouseAuth": "u8t8gf6ds06re",
+  "TransferIP": "0.0.0.0",
+  "TransferPort": 9999,
+  "TargetAggSize": 0
+}
