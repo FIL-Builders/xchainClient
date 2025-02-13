@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/hex"
+	"errors"
 	"path/filepath"
 
 	"encoding/json"
@@ -159,10 +160,28 @@ func main() {
 			},
 			{
 				Name:  "client",
-				Usage: "Send data from cross chain to filecoin",
+				Usage: "Send car file from cross chain to filecoin",
 				Subcommands: []*cli.Command{
 					{
-						Name:      "offer",
+						Name:      "offer-file",
+						Usage:     "Offer data by providing a file and payment parameters (file is pre-processed automatically)",
+						ArgsUsage: "<file_path> <payment-addr> <payment-amount>",
+						Flags: []cli.Flag{
+							&cli.StringFlag{
+								Name:  "config",
+								Usage: "Path to the configuration file",
+								Value: "./config/config.json",
+							},
+							&cli.StringFlag{
+								Name:     "chain",
+								Usage:    "Name of the source blockchain (e.g., ethereum, polygon)",
+								Required: true,
+							},
+						},
+						Action: offerFileAction,
+					},
+					{
+						Name:      "offer-car",
 						Usage:     "Offer data by providing file and payment parameters",
 						ArgsUsage: "<commP> <size> <cid> <bufferLocation> <token-hex> <token-amount>",
 						Flags: []cli.Flag{
@@ -1188,11 +1207,16 @@ func loadPrivateKey(cfg *config.Config) (*bind.TransactOpts, error) {
 	ks := keystore.NewKeyStore(tempDir, keystore.StandardScryptN, keystore.StandardScryptP)
 
 	// Import existing key
-	a, err := ks.Import(keyJSON, os.Getenv("XCHAIN_PASSPHRASE"), os.Getenv("XCHAIN_PASSPHRASE"))
+	passphrase := os.Getenv("XCHAIN_PASSPHRASE")
+	if passphrase == "" {
+		return nil, errors.New("environment variable XCHAIN_PASSPHRASE is not set or empty")
+	}
+
+	a, err := ks.Import(keyJSON, passphrase, passphrase)
 	if err != nil {
 		return nil, fmt.Errorf("failed to import key %s: %w", cfg.ClientAddr, err)
 	}
-	if err := ks.Unlock(a, os.Getenv("XCHAIN_PASSPHRASE")); err != nil {
+	if err := ks.Unlock(a, passphrase); err != nil {
 		return nil, fmt.Errorf("failed to unlock keystore: %w", err)
 	}
 

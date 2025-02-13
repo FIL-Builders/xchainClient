@@ -19,7 +19,7 @@ go build -o xchainClient
 1. Create a `.env` file to store your **XCHAIN_PASSPHRASE** (used for unlocking the Ethereum keystore):
 
 ```sh
-echo "XCHAIN_PASSPHRASE=your_secure_password" > .env
+echo "export XCHAIN_PASSPHRASE=your_secure_password" > .env
 ```
 
 2. **Source the file** to load the variable into your environment:
@@ -63,17 +63,39 @@ To start the Xchain adapter daemon, run:
 
 ---
 
-## 📡 **Submitting an Offer**
+## 📡 **offering data with automatic car processing**
 
-To submit an offer to the OnRamp contract:
+the `offer-file` command simplifies offering data by automatically:
+
+1. converting the file into a car format.
+2. calculating the commp (content identifier for proofs).
+3. uploading the car file to a local buffer service.
+4. submitting an offer transaction to the blockchain.
 
 ```sh
-./xchainClient client offer <commP> <size> <cid> <bufferLocation> <token-hex> <token-amount>
+./xchainclient client offer-file <file_path> <payment-addr> <payment-amount> --chain ethereum --config ./config/config.json
 ```
 
-Example:
+example:
+
 ```sh
-./xchainClient client offer bafkreihdwdcef4n... 128 /data/file1 /buffers/ 0x6B175474E89094C44Da98b954EedeAC495271d0F 1000
+./xchainclient client offer-file ./data/sample.txt 0x5c31e78f3f7329769734f5ff1ac7e22c243e817e 1000 --chain polygon
+```
+
+---
+
+## 📡 **submitting an offer (manual method)**
+
+to submit an offer to the onramp contract manually:
+
+```sh
+./xchainclient client offer <commp> <size> <cid> <bufferlocation> <token-hex> <token-amount>
+```
+
+example:
+
+```sh
+./xchainclient client offer bafkreihdwdcef4n... 128 /data/file1 /buffers/ 0x6b175474e89094c44da98b954eedeac495271d0f 1000
 ```
 
 ---
