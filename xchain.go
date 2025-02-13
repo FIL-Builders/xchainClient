@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/hex"
+	"errors"
 	"path/filepath"
 
 	"encoding/json"
@@ -1198,11 +1199,16 @@ func loadPrivateKey(cfg *Config) (*bind.TransactOpts, error) {
 	ks := keystore.NewKeyStore(tempDir, keystore.StandardScryptN, keystore.StandardScryptP)
 
 	// Import existing key
-	a, err := ks.Import(keyJSON, os.Getenv("XCHAIN_PASSPHRASE"), os.Getenv("XCHAIN_PASSPHRASE"))
+	passphrase := os.Getenv("XCHAIN_PASSPHRASE")
+	if passphrase == "" {
+		return nil, errors.New("environment variable XCHAIN_PASSPHRASE is not set or empty")
+	}
+
+	a, err := ks.Import(keyJSON, passphrase, passphrase)
 	if err != nil {
 		return nil, fmt.Errorf("failed to import key %s: %w", cfg.ClientAddr, err)
 	}
-	if err := ks.Unlock(a, os.Getenv("XCHAIN_PASSPHRASE")); err != nil {
+	if err := ks.Unlock(a, passphrase); err != nil {
 		return nil, fmt.Errorf("failed to unlock keystore: %w", err)
 	}
 
