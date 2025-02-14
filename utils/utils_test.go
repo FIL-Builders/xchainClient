@@ -16,7 +16,7 @@ import (
 
 // Test function to test chainID encoding
 func TestChainIdEncoding(t *testing.T) {
-	configPath := "./config/config.json" // Replace with the actual path to your config file
+	configPath := "../config/config.json" // Replace with the actual path to your config file
 
 	cfg, err := config.LoadConfig(configPath)
 	if err != nil {
