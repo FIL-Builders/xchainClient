@@ -1,12 +1,15 @@
-package main
+package buffer
 
 import (
+	"context"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"path/filepath"
 
+	"github.com/FIL-Builders/xchainClient/config"
 	"github.com/mitchellh/go-homedir"
 
 	"strconv"
@@ -19,7 +22,42 @@ type BufferHTTPService struct {
 	mu       sync.Mutex
 }
 
-func NewBufferHTTPService(basePath string) (*BufferHTTPService, error) {
+// Function to start the buffer service
+func StartBufferService(ctx context.Context, cfg *config.Config) error {
+	path, err := homedir.Expand(cfg.BufferPath)
+	if err != nil {
+		return err
+	}
+	if err := os.MkdirAll(path, os.ModePerm); err != nil {
+		return err
+	}
+
+	srv, err := newBufferHTTPService(cfg.BufferPath)
+	if err != nil {
+		return &http.MaxBytesError{}
+	}
+	http.HandleFunc("/put", srv.PutHandler)
+	http.HandleFunc("/get", srv.GetHandler)
+
+	log.Printf("Buffer service starting on port %d\n", cfg.BufferPort)
+	server := &http.Server{
+		Addr:    fmt.Sprintf("0.0.0.0:%d", cfg.BufferPort),
+		Handler: nil, // http.DefaultServeMux
+	}
+
+	// Start server in a goroutine
+	go func() {
+		if err := server.ListenAndServe(); err != http.ErrServerClosed {
+			log.Fatalf("Buffer HTTP server ListenAndServe: %v", err)
+		}
+	}()
+
+	// Wait for context cancellation
+	<-ctx.Done()
+	return server.Shutdown(context.Background())
+}
+
+func newBufferHTTPService(basePath string) (*BufferHTTPService, error) {
 	path, err := homedir.Expand(basePath)
 	if err != nil {
 		return nil, err
