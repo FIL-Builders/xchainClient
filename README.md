@@ -11,7 +11,7 @@ Ensure you have **Go** installed. Then, clone the repository and build the proje
 ```sh
 git clone https://github.com/your-repo/xchainClient.git
 cd xchainClient
-go build -o xchainClient
+go build -o xchainClient ./cmd/xchain.go
 ```
 ---
 

@@ -2,25 +2,17 @@
   "destination": {
     "ChainID": 314159,
     "LotusAPI": "https://api.calibration.node.glif.io",
-    "ProverAddr": "0x61F0ACE5ad40466Eb43141fa56Cf87758b6ffbA8"
+    "ProverAddr": "0xf574ea1052d6fa856ff2ba51a6b6a91d37fd0175"
   },
   "sources": {
-    "filecoin": {
-      "Api": "wss://wss.calibration.node.glif.io/apigw/lotus/rpc/v1",
-      "OnRampAddress": "0x750CbAcFbE58C453cEA1E5a2617193D60B7Cb451"
-    },
     "avalanche": {
       "Api": "wss://api.avax-test.network/ext/bc/C/ws",
-      "OnRampAddress": "0x123...abc"
-    },
-    "polygon": {
-      "Api": "wss://polygon-rpc.com",
-      "OnRampAddress": "0x456...def"
+      "OnRampAddress": "0x4f38B53E54ADFC3A3Aa820Ccd2e43a4a0605CF92"
     }
   },
   "KeyPath": "./config/xchain_key.json",
-  "ClientAddr": "0x5c31e78f3f7329769734f5ff1ac7e22c243e817e",
-  "PayoutAddr": "0x5c31e78f3f7329769734f5ff1ac7e22c243e817e",
+  "ClientAddr": "0x8C61C13fc41d63eDf5a05A8611CcdD774dE3e9A4",
+  "PayoutAddr": "0x8C61C13fc41d63eDf5a05A8611CcdD774dE3e9A4",
   "OnRampABIPath": "./config/onramp-abi.json",
   "BufferPath": "~/.xchain/buffer",
   "BufferPort": 5077,

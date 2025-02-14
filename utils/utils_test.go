@@ -1,4 +1,4 @@
-package main
+package utils
 
 import (
 	"context"
@@ -43,7 +43,7 @@ func TestChainIdEncoding(t *testing.T) {
 	}
 
 	// Encode the chainID
-	encodedChainID, err := encodeChainID(chainID)
+	encodedChainID, err := EncodeChainID(chainID)
 	if err != nil {
 		t.Fatalf("failed to encode chainID: %v", err)
 	}
