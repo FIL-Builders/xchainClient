@@ -15,6 +15,7 @@ type DestinationChainConfig struct {
 
 // SourceChainConfig represents a blockchain that can send data to Filecoin.
 type SourceChainConfig struct {
+	ChainID       int    `json:"ChainID"`
 	Api           string `json:"Api"`
 	OnRampAddress string `json:"OnRampAddress"`
 }

@@ -149,14 +149,17 @@ The Xchain Client uses a `config.json` file to store its settings. The configura
   },
   "sources": {
     "filecoin": {
+      "ChainID": 314159,
       "Api": "wss://wss.calibration.node.glif.io/apigw/lotus/rpc/v1",
       "OnRampAddress": "0x750CbAcFbE58C453cEA1E5a2617193D60B7Cb451"
     },
     "avalanche": {
+      "ChainID": 43113,
       "Api": "wss://api.avax-test.network/ext/bc/C/ws",
       "OnRampAddress": "0x123...abc"
     },
     "polygon": {
+      "ChainID": 80001,
       "Api": "wss://polygon-rpc.com",
       "OnRampAddress": "0x456...def"
     }
@@ -182,6 +185,7 @@ The Xchain Client uses a `config.json` file to store its settings. The configura
 | **destination.ChainID** | Ethereum-compatible chain ID for the destination network. |
 | **destination.LotusAPI** | Filecoin Lotus API endpoint used for deal tracking. |
 | **destination.ProverAddr** | Ethereum address of the prover verifying storage deals. |
+| **sources.ChainID** | Ethereum-compatible chain ID for the sources network. |
 | **sources.filecoin.Api** | WebSocket API for Filecoin calibration network. |
 | **sources.filecoin.OnRampAddress** | Filecoin OnRamp contract address. |
 | **sources.avalanche.Api** | WebSocket API for Avalanche network. |

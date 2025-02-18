@@ -165,7 +165,7 @@ func NewAggregator(ctx context.Context, cfg *config.Config, srcCfg *config.Sourc
 	payoutAddress := common.HexToAddress(cfg.PayoutAddr)
 	onramp := bind.NewBoundContract(onRampContractAddress, *parsedABI, client, client, client)
 
-	auth, err := utils.LoadPrivateKey(cfg)
+	auth, err := utils.LoadPrivateKey(cfg, cfg.Destination.ChainID)
 	if err != nil {
 		return nil, err
 	}
@@ -350,6 +350,7 @@ func (a *aggregator) runAggregate(ctx context.Context) error {
 				// Remove the latest offer which took us over
 				pieces = pieces[:len(pieces)-1]
 				aggregatePieces = aggregatePieces[:len(aggregatePieces)-1]
+				fmt.Println("subdeals are: ", len(aggregatePieces))
 				agg, err := datasegment.NewAggregate(filabi.PaddedPieceSize(a.targetDealSize), aggregatePieces)
 				if err != nil {
 					return fmt.Errorf("failed to create aggregate from pending, should not be reachable: %w", err)

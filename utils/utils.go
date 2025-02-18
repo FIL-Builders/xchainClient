@@ -52,7 +52,7 @@ func EncodeChainID(chainID *big.Int) ([]byte, error) {
 
 // Load and unlock the keystore with XCHAIN_PASSPHRASE env var
 // return a transaction authorizer
-func LoadPrivateKey(cfg *config.Config) (*bind.TransactOpts, error) {
+func LoadPrivateKey(cfg *config.Config, chainId int) (*bind.TransactOpts, error) {
 	path, err := homedir.Expand(cfg.KeyPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get absolute path: %w", err)
@@ -82,6 +82,7 @@ func LoadPrivateKey(cfg *config.Config) (*bind.TransactOpts, error) {
 	}
 
 	a, err := ks.Import(keyJSON, passphrase, passphrase)
+	fmt.Println("Signer address is: ", a.Address)
 	if err != nil {
 		return nil, fmt.Errorf("failed to import key %s: %w", cfg.ClientAddr, err)
 	}
@@ -89,5 +90,5 @@ func LoadPrivateKey(cfg *config.Config) (*bind.TransactOpts, error) {
 		return nil, fmt.Errorf("failed to unlock keystore: %w", err)
 	}
 
-	return bind.NewKeyStoreTransactorWithChainID(ks, a, big.NewInt(int64(cfg.Destination.ChainID)))
+	return bind.NewKeyStoreTransactorWithChainID(ks, a, big.NewInt(int64(chainId)))
 }

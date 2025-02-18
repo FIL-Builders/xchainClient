@@ -117,7 +117,7 @@ func OfferFileAction(cctx *cli.Context) error {
 		return fmt.Errorf("failed to load ABI: %v", err)
 	}
 	onramp := bind.NewBoundContract(contractAddress, *parsedABI, client, client, client)
-	auth, err := utils.LoadPrivateKey(cfg)
+	auth, err := utils.LoadPrivateKey(cfg, srcCfg.ChainID)
 	if err != nil {
 		return fmt.Errorf("failed to load private key: %v", err)
 	}
@@ -174,7 +174,7 @@ func OfferCarAction(cctx *cli.Context) error {
 	}
 
 	// Get auth
-	auth, err := utils.LoadPrivateKey(cfg)
+	auth, err := utils.LoadPrivateKey(cfg, srcCfg.ChainID)
 	if err != nil {
 		log.Fatal(err)
 	}
