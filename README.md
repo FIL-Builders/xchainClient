@@ -1,8 +1,7 @@
-# Xchain Client
+# xchainClient
 
-Xchain Client provides a set of tools to facilitate cross-chain data movement from Filecoin storage to any blockchain. It includes utilities for managing Ethereum accounts, submitting offers, and handling deal status.
+The xchainClient provides a set of tools to facilitate cross-chain data movement from any blockchain to Filecoin network. It includes utilities for managing Ethereum accounts, submitting offers, and handling Filecoin deal process.
 
----
 
 ## 🚀 Installation
 
@@ -13,10 +12,9 @@ git clone https://github.com/your-repo/xchainClient.git
 cd xchainClient
 go build -o xchainClient ./cmd/xchain.go
 ```
----
 
 ## 📌 Configure Environment Variables
-1. Create a `.env` file to store your **XCHAIN_PASSPHRASE** (used for unlocking the Ethereum keystore):
+1. Create a `.env` file to store your **XCHAIN_PASSPHRASE** (used for unlocking the keystore to interact with Ethereum compatbile chains):
     ```sh
     echo "export XCHAIN_PASSPHRASE=your_secure_password" > .env
     ```
@@ -49,9 +47,11 @@ Keystore File Path: /home/user/onramp-contracts/xchain_key.json
 
 🔹 This saves the keystore file **at the exact location specified**. The file is **password-protected** and should be stored securely.
 
-🔹 To run xChainClient for a specific chain, you need to request some test token to this wallet address from that chain. 
+🔹 To enable xChainClient to interact with both the source and destination chains (Filecoin in this case), you need to acquire test tokens for your wallet address on each chain's testnet to cover transaction fees.
 
----
+- Filecoin calibration faucets: you can find [here](https://docs.filecoin.io/networks/calibration#resources). 
+- other L1 which you build your application on. 
+
 
 ## 🏃‍♂️ Running the Daemon
 
@@ -63,7 +63,6 @@ To start the Xchain adapter daemon, run:
 ./xchainClient daemon --config ./config/config.json --chain avalanche --buffer-service --aggregation-service
 ```
 
----
 
 ## 📡 **offering data with automatic car processing**
 
@@ -84,8 +83,6 @@ example:
 ./xchainclient client offer-file --chain avalanche ./data/sample.txt 0x5c31e78f3f7329769734f5ff1ac7e22c243e817e 1000
 ```
 
----
-
 ## 📡 **submitting an offer (manual method)**
 
 to submit an offer to the onramp contract manually:
@@ -100,8 +97,6 @@ example:
 ./xchainclient client offer bafkreihdwdcef4n... 128 /data/file1 /buffers/ 0x6b175474e89094c44da98b954eedeac495271d0f 1000
 ```
 
----
-
 ## 🔍 **Checking Deal Status**
 
 To check the deal status for a CID:
@@ -115,26 +110,24 @@ Example:
 ./xchainClient client dealStatus bafkreihdwdcef4n 42
 ```
 
----
-
 ## 📖 **Additional Notes**
 - **Keep your `config.json` file secure** since it contains sensitive information like private key paths and authentication tokens.
 - **Use strong passwords** when generating Ethereum accounts.
 - **Regularly back up keystore files** to avoid losing access to funds.
 
----
+## 💡 Troubleshooting
+**Error: "config.json not found"**
 
-## 💡 **Troubleshooting**
-### Error: "config.json not found"
-Ensure the config file is correctly placed in the `config/` directory and named `config.json`.
+-Ensure the config file is correctly placed in the `config/` directory and named `config.json`.
 
-### Error: "invalid keystore file"
+**Error: "invalid keystore file"**
+
 Ensure the keystore file is correctly generated using `generate-account` and that you are using the correct password.
 
-### Error: "failed to connect to API"
+**Error: "failed to connect to API"**
+
 Check that your `Api` field in `config.json` is correctly set to a working Ethereum/Web3 provider.
 
----
 ## 🛠️ Configuration
 
 ### **Config File (`config.json`)**
@@ -187,13 +180,9 @@ The Xchain Client uses a `config.json` file to store its settings. The configura
 | **destination.ChainID** | Ethereum-compatible chain ID for the destination network. |
 | **destination.LotusAPI** | Filecoin Lotus API endpoint used for deal tracking. |
 | **destination.ProverAddr** | Ethereum address of the prover verifying storage deals. |
-| **sources.ChainID** | Ethereum-compatible chain ID for the sources network. |
-| **sources.filecoin.Api** | WebSocket API for Filecoin calibration network. |
-| **sources.filecoin.OnRampAddress** | Filecoin OnRamp contract address. |
+| **sources.avalanche.ChainID** | Ethereum-compatible chain ID for the sources network. |
 | **sources.avalanche.Api** | WebSocket API for Avalanche network. |
 | **sources.avalanche.OnRampAddress** | Avalanche OnRamp contract address. |
-| **sources.polygon.Api** | WebSocket API for Polygon network. |
-| **sources.polygon.OnRampAddress** | Polygon OnRamp contract address. |
 | **KeyPath** | Path to the keystore file that contains the Ethereum private key. |
 | **ClientAddr** | Ethereum wallet address used for making transactions. |
 | **PayoutAddr** | Address where storage rewards should be sent. |
@@ -205,7 +194,7 @@ The Xchain Client uses a `config.json` file to store its settings. The configura
 | **LighthouseAuth** | Authentication token for Lighthouse. |
 | **TransferIP** | IP address for cross-chain data transfer service (`0.0.0.0` for all interfaces). |
 | **TransferPort** | Port for the cross-chain data transfer service (`9999` by default). |
-| **TargetAggSize** | Specifies the aggregation size for deal bundling (currently set to `0`). |
+| **TargetAggSize** | Specifies the aggregation size for deal bundling, should be power of 2. |
 
 ### **Multi-Chain Support**
 Xchain Client supports interaction with multiple blockchains. Users can configure multiple `sources` to enable cross-chain deal submissions. Supported networks include:
@@ -215,12 +204,8 @@ Xchain Client supports interaction with multiple blockchains. Users can configur
 
 Each source requires an **API endpoint** and an **OnRamp contract address**, which are specified under the `sources` field in `config.json`.
 
----
-
 ## 🤝 **Contributing**
 We welcome contributions! Feel free to submit pull requests or open issues.
-
----
 
 ## 📜 **License**
 This project is licensed under the MIT License.
