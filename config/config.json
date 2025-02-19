@@ -2,12 +2,12 @@
   "destination": {
     "ChainID": 314159,
     "LotusAPI": "https://api.calibration.node.glif.io",
-    "ProverAddr": "0xf574ea1052d6fa856ff2ba51a6b6a91d37fd0175"
+    "ProverAddr": "0x8560C0fAC0EF0547863e1748D15B85a5c3FF4B2f"
   },
   "sources": {
     "avalanche": {
       "Api": "wss://api.avax-test.network/ext/bc/C/ws",
-      "OnRampAddress": "0x4f38B53E54ADFC3A3Aa820Ccd2e43a4a0605CF92"
+      "OnRampAddress": "0xb44cc5FB8CfEdE63ce1758CE0CDe0958A7702a16"
     }
   },
   "KeyPath": "./config/xchain_key.json",
