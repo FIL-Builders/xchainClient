@@ -1,4 +1,4 @@
-package main
+package utils
 
 import (
 	"context"
@@ -16,7 +16,7 @@ import (
 
 // Test function to test chainID encoding
 func TestChainIdEncoding(t *testing.T) {
-	configPath := "./config/config.json" // Replace with the actual path to your config file
+	configPath := "../config/config.json" // Replace with the actual path to your config file
 
 	cfg, err := config.LoadConfig(configPath)
 	if err != nil {
@@ -43,7 +43,7 @@ func TestChainIdEncoding(t *testing.T) {
 	}
 
 	// Encode the chainID
-	encodedChainID, err := encodeChainID(chainID)
+	encodedChainID, err := EncodeChainID(chainID)
 	if err != nil {
 		t.Fatalf("failed to encode chainID: %v", err)
 	}

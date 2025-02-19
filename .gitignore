@@ -28,3 +28,4 @@ go.work.sum
 
 # config
 config/xchain_key.json
+data/

@@ -1,4 +1,4 @@
-package main
+package client
 
 import (
 	"bufio"
@@ -8,13 +8,18 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"math/big"
 	"net/http"
 	"os"
 	"path"
+	"path/filepath"
 	"strconv"
 
 	"github.com/FIL-Builders/xchainClient/config"
+	"github.com/FIL-Builders/xchainClient/utils"
+	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
+	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ipfs/go-cid"
@@ -33,7 +38,7 @@ import (
 	commp "github.com/filecoin-project/go-fil-commp-hashhash"
 )
 
-func offerFileAction(cctx *cli.Context) error {
+func OfferFileAction(cctx *cli.Context) error {
 	// Expect exactly 3 arguments: <file_path> <payment-addr> <payment-amount>
 	if cctx.Args().Len() != 3 {
 		return fmt.Errorf("Usage: <file_path> <payment-addr> <payment-amount>")
@@ -107,12 +112,12 @@ func offerFileAction(cctx *cli.Context) error {
 		return fmt.Errorf("failed to connect to Ethereum client for source chain %s at %s: %v", chainName, srcCfg.Api, err)
 	}
 	contractAddress := common.HexToAddress(srcCfg.OnRampAddress)
-	parsedABI, err := LoadAbi(cfg.OnRampABIPath)
+	parsedABI, err := utils.LoadAbi(cfg.OnRampABIPath)
 	if err != nil {
 		return fmt.Errorf("failed to load ABI: %v", err)
 	}
 	onramp := bind.NewBoundContract(contractAddress, *parsedABI, client, client, client)
-	auth, err := loadPrivateKey(cfg)
+	auth, err := utils.LoadPrivateKey(cfg, srcCfg.ChainID)
 	if err != nil {
 		return fmt.Errorf("failed to load private key: %v", err)
 	}
@@ -135,6 +140,71 @@ func offerFileAction(cctx *cli.Context) error {
 		return fmt.Errorf("failed to wait for tx: %v", err)
 	}
 	log.Printf("Tx %s included: %d", tx.Hash().Hex(), receipt.Status)
+	return nil
+}
+
+func OfferCarAction(cctx *cli.Context) error {
+	cfg, err := config.LoadConfig(cctx.String("config"))
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// Get chain name
+	chainName := cctx.String("chain")
+	srcCfg, err := config.GetSourceConfig(cfg, chainName)
+	if err != nil {
+		log.Fatalf("Invalid chain name '%s': %v", chainName, err)
+	}
+
+	// Dial network
+	client, err := ethclient.Dial(srcCfg.Api)
+	if err != nil {
+		log.Fatalf("failed to connect to Ethereum client for source chain %s at %s: %v", chainName, srcCfg.Api, err)
+	}
+
+	// Load onramp contract handle
+	contractAddress := common.HexToAddress(srcCfg.OnRampAddress)
+	parsedABI, err := utils.LoadAbi(cfg.OnRampABIPath)
+	if err != nil {
+		log.Fatal(err)
+	}
+	onramp := bind.NewBoundContract(contractAddress, *parsedABI, client, client, client)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// Get auth
+	auth, err := utils.LoadPrivateKey(cfg, srcCfg.ChainID)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// Send Tx
+	offer, err := MakeOffer(
+		cctx.Args().First(),
+		cctx.Args().Get(1),
+		cctx.Args().Get(2),
+		cctx.Args().Get(3),
+		cctx.Args().Get(4),
+		cctx.Args().Get(5),
+		*parsedABI,
+	)
+
+	if err != nil {
+		log.Fatalf("failed to pack offer data params: %v", err)
+	}
+	tx, err := onramp.Transact(auth, "offerData", offer)
+	if err != nil {
+		log.Fatalf("failed to send tx: %v", err)
+	}
+
+	log.Printf("Waiting for transaction: %s\n", tx.Hash().Hex())
+	receipt, err := bind.WaitMined(cctx.Context, client, tx)
+	if err != nil {
+		log.Fatalf("failed to wait for tx: %v", err)
+	}
+	log.Printf("Tx %s included: %d", tx.Hash().Hex(), receipt.Status)
+
 	return nil
 }
 
@@ -276,4 +346,87 @@ func calcStreamCommp(carPath string) (string, uint64, error) {
 	}
 
 	return commCid.String(), paddedSize, nil
+}
+
+func MakeOffer(commpStr string, sizeStr string, cidStr string, location string, token string, amountStr string, abi abi.ABI) (*Offer, error) {
+	log.Printf("MakeOffer called with commpStr: %s, sizeStr: %s, cidStr: %s,  location: %s, token: %s, amountStr: %s\n", commpStr, sizeStr, cidStr, location, token, amountStr)
+
+	commP, err := cid.Decode(commpStr)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse cid %w", err)
+	}
+
+	size, err := strconv.Atoi(sizeStr)
+	if err != nil {
+		return nil, err
+	}
+	amount, err := strconv.Atoi(amountStr)
+	if err != nil {
+		return nil, err
+	}
+
+	amountBig := big.NewInt(0).SetUint64(uint64(amount))
+
+	offer := Offer{
+		CommP:    commP.Bytes(),
+		Location: location,
+		Cid:      cidStr,
+		Token:    common.HexToAddress(token),
+		Amount:   amountBig,
+		Size:     uint64(size),
+	}
+
+	return &offer, nil
+}
+
+// Mirror OnRamp.sol's `Offer` struct
+type Offer struct {
+	CommP    []uint8        `json:"commP"`
+	Size     uint64         `json:"size"`
+	Cid      string         `json:"cid"`
+	Location string         `json:"location"`
+	Amount   *big.Int       `json:"amount"`
+	Token    common.Address `json:"token"`
+}
+
+// generateEthereumAccount creates a new Ethereum account and saves it to the specified JSON file
+func GenerateEthereumAccount(keystoreFile, password string) (string, error) {
+	// Validate file extension
+	if filepath.Ext(keystoreFile) != ".json" {
+		return "", fmt.Errorf("keystore file must have a .json extension")
+	}
+
+	// Ensure directory exists
+	keystoreDir := filepath.Dir(keystoreFile)
+	if err := os.MkdirAll(keystoreDir, 0700); err != nil {
+		return "", fmt.Errorf("failed to create keystore directory: %v", err)
+	}
+
+	// Create a temporary keystore
+	tempDir, err := os.MkdirTemp("", "keystore-tmp")
+	if err != nil {
+		return "", fmt.Errorf("failed to create temporary keystore directory: %v", err)
+	}
+	defer os.RemoveAll(tempDir) // Cleanup temp keystore
+
+	ks := keystore.NewKeyStore(tempDir, keystore.StandardScryptN, keystore.StandardScryptP)
+
+	// Generate a new account
+	account, err := ks.NewAccount(password)
+	if err != nil {
+		return "", fmt.Errorf("failed to create new account: %v", err)
+	}
+
+	// Read the generated keystore file
+	keyJSON, err := os.ReadFile(account.URL.Path)
+	if err != nil {
+		return "", fmt.Errorf("failed to read generated keystore file: %v", err)
+	}
+
+	// Save to the specified file path
+	if err := os.WriteFile(keystoreFile, keyJSON, 0600); err != nil {
+		return "", fmt.Errorf("failed to save keystore file: %v", err)
+	}
+
+	return account.Address.Hex(), nil
 }
