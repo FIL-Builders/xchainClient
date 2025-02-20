@@ -70,7 +70,7 @@ const (
 	// libp2p identifier for latest deal protocol
 	DealProtocolv120 = "/fil/storage/mk/1.2.0"
 	// Delay to start deal at. For 2k devnet 4 second block time this is 13.3 minutes TODO Config
-	dealDelayEpochs = 200
+	dealDelayEpochs = 3000
 	// Storage deal duration, TODO figure out what to do about this, either comes from offer or config
 	dealDuration = 518400 // 6 months (on mainnet)
 )

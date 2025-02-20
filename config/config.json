@@ -2,7 +2,7 @@
   "destination": {
     "ChainID": 314159,
     "LotusAPI": "https://api.calibration.node.glif.io",
-    "ProverAddr": "0x8560C0fAC0EF0547863e1748D15B85a5c3FF4B2f"
+    "ProverAddr": "0xF246Df7d45C4f2dBD83EA6f18e0754e2EC225707"
   },
   "sources": {
     "avalanche": {
