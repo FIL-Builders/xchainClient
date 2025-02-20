@@ -165,7 +165,8 @@ func NewAggregator(ctx context.Context, cfg *config.Config, srcCfg *config.Sourc
 	payoutAddress := common.HexToAddress(cfg.PayoutAddr)
 	onramp := bind.NewBoundContract(onRampContractAddress, *parsedABI, client, client, client)
 
-	auth, err := utils.LoadPrivateKey(cfg, cfg.Destination.ChainID)
+	//aggregator need to call smart contract on source Chain to send podsi proof
+	auth, err := utils.LoadPrivateKey(cfg, srcCfg.ChainID)
 	if err != nil {
 		return nil, err
 	}
@@ -481,7 +482,7 @@ func (a *aggregator) sendDeal(ctx context.Context, aggCommp cid.Cid, transferID 
 		Proposal: market.DealProposal{
 			PieceCID:             aggCommp,
 			PieceSize:            filabi.PaddedPieceSize(a.targetDealSize),
-			VerifiedDeal:         false,
+			VerifiedDeal:         true,
 			Client:               filClient,
 			Provider:             a.spActorAddr,
 			StartEpoch:           dealStart,
