@@ -413,7 +413,7 @@ func (a *aggregator) runAggregate(ctx context.Context) error {
 				}
 				a.transferID++
 				a.transferLk.Unlock()
-				log.Printf("Transfer ID %d scheduled for aggregate %s with %d urls.", transferID, aggCommp.String(), len(locations))
+				log.Printf("Transfer ID %d scheduled for aggregation %s with %d urls.", transferID, aggCommp.String(), len(locations))
 
 				// Aggregate data into a file
 				homeDir, err := os.UserHomeDir()
@@ -484,7 +484,7 @@ func (a *aggregator) sendDeal(ctx context.Context, aggCommp cid.Cid, transferID 
 
 	// Construct deal
 	dealUuid := uuid.New()
-	log.Printf("making deal for commp %s, UUID=%s\n", aggCommp.String(), dealUuid)
+	log.Printf("making deal for commp=%s, UUID=%s\n", aggCommp.String(), dealUuid)
 
 	if url == "" {
 		url = fmt.Sprintf("http://%s/?id=%d", a.transferAddr, transferID)
@@ -663,12 +663,12 @@ LOOP:
 
 			log.Printf("Sending offer NO. %d for aggregation\n", event.OfferID)
 			log.Printf("  Offer:\n")
-			log.Printf("    Offer: %v\n", event.Offer.CommP)
+			log.Printf("    CommP: %v\n", event.Offer.CommP)
 			log.Printf("    Size: %d\n", event.Offer.Size)
 			log.Printf("    Cid: %s\n", event.Offer.Cid)
 			log.Printf("    Location: %s\n", event.Offer.Location)
-			log.Printf("    Amount: %s\n", event.Offer.Amount.String()) // big.Int needs .String() for printing
-			log.Printf("    Token: %s\n", event.Offer.Token.Hex())      // Address needs .Hex() for printing
+			log.Printf("    Payment Token: %s\n", event.Offer.Token.Hex())      // Address needs .Hex() for printing
+			log.Printf("    Payment Amount: %s\n", event.Offer.Amount.String()) // big.Int needs .String() for printing
 
 			// This is where we should make packing decisions.
 			// In the current prototype we accept all offers regardless
@@ -709,15 +709,6 @@ func (a *aggregator) saveAggregateToFile(trensferId int, location string) error 
 		return fmt.Errorf("failed to create file: %w", err)
 	}
 	defer file.Close()
-
-	// Get file info to check size
-	fileInfo, err := file.Stat()
-	if err != nil {
-		return fmt.Errorf("failed to get file info: %w", err)
-	}
-
-	// Print or return the file size
-	fmt.Printf("Car File size: %d bytes\n", fileInfo.Size())
 
 	// Copy the aggregated data to the file
 	_, err = io.Copy(file, aggReader)
