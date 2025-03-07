@@ -22,5 +22,6 @@
   "LighthouseAuth": "",
   "TransferIP": "0.0.0.0",
   "TransferPort": 9999,
-  "TargetAggSize": 4194304
+  "TargetAggSize": 4194304,
+  "MinDealSize": 2097152
 }

@@ -1,7 +1,11 @@
 package aggregator
 
 import (
+	"os"
+	"path/filepath"
+
 	"github.com/FIL-Builders/xchainClient/config"
+	"github.com/FIL-Builders/xchainClient/services/buffer"
 	"github.com/FIL-Builders/xchainClient/utils"
 
 	"bytes"
@@ -13,6 +17,7 @@ import (
 	"io"
 	"log"
 	"math/big"
+	"math/bits"
 	"net/http"
 	"regexp"
 	"strconv"
@@ -65,36 +70,36 @@ const (
 		"eb27adefefe9c93206960bb0147b9ed5e1e948b012026576181d0a020801"
 	// Size of the padded prefix car in bytes
 	prefixCARSizePadded = uint64(256)
-	// Data transfer port
-	transferPort = 1728
 	// libp2p identifier for latest deal protocol
 	DealProtocolv120 = "/fil/storage/mk/1.2.0"
 	// Delay to start deal at. For 2k devnet 4 second block time this is 13.3 minutes TODO Config
-	dealDelayEpochs = 200
+	dealDelayEpochs = 3000
 	// Storage deal duration, TODO figure out what to do about this, either comes from offer or config
 	dealDuration = 518400 // 6 months (on mainnet)
 )
 
 type aggregator struct {
-	client         *ethclient.Client         // raw client for log subscriptions
-	onramp         *bind.BoundContract       // onramp binding over raw client for message sending
-	auth           *bind.TransactOpts        // auth for message sending
-	abi            *abi.ABI                  // onramp abi for log subscription and message sending
-	onrampAddr     common.Address            // onramp address for log subscription
-	proverAddr     common.Address            // prover address for client contract deal
-	payoutAddr     common.Address            // aggregator payout address for receiving funds
-	ch             chan DataReadyEvent       // pass events to seperate goroutine for processing
-	transfers      map[int]AggregateTransfer // track aggregate data awaiting transfer
-	transferLk     sync.RWMutex              // Mutex protecting transfers map
-	transferID     int                       // ID of the next transfer
-	transferAddr   string                    // address to listen for transfer requests
-	targetDealSize uint64                    // how big aggregates should be
-	host           host.Host                 // libp2p host for deal protocol to boost
-	spDealAddr     *peer.AddrInfo            // address to reach boost (or other) deal v 1.2 provider
-	spActorAddr    address.Address           // address of the storage provider actor
-	lotusAPI       v0api.FullNode            // Lotus API for determining deal start epoch and collateral bounds
-	LighthouseAuth string                    // Auth token to interact with Lighthouse Deal Engine
-	cleanup        func()                    // cleanup function to call on shutdown
+	client           *ethclient.Client         // raw client for log subscriptions
+	onramp           *bind.BoundContract       // onramp binding over raw client for message sending
+	auth             *bind.TransactOpts        // auth for message sending
+	abi              *abi.ABI                  // onramp abi for log subscription and message sending
+	onrampAddr       common.Address            // onramp address for log subscription
+	proverAddr       common.Address            // prover address for client contract deal
+	payoutAddr       common.Address            // aggregator payout address for receiving funds
+	ch               chan DataReadyEvent       // pass events to seperate goroutine for processing
+	transfers        map[int]AggregateTransfer // track aggregate data awaiting transfer
+	transferLk       sync.RWMutex              // Mutex protecting transfers map
+	transferID       int                       // ID of the next transfer
+	transferAddr     string                    // address to listen for transfer requests
+	minDealSize      uint64                    // minimum deal size
+	targetDealSize   uint64                    // how big aggregates should be
+	host             host.Host                 // libp2p host for deal protocol to boost
+	spDealAddr       *peer.AddrInfo            // address to reach boost (or other) deal v 1.2 provider
+	spActorAddr      address.Address           // address of the storage provider actor
+	lotusAPI         v0api.FullNode            // Lotus API for determining deal start epoch and collateral bounds
+	LighthouseAuth   string                    // Auth token to interact with Lighthouse Deal Engine
+	lighthouseApiKey string                    // API key for lighthouse
+	cleanup          func()                    // cleanup function to call on shutdown
 }
 
 // Define a Go struct to match the DataReady event from the OnRamp contract
@@ -210,23 +215,25 @@ func NewAggregator(ctx context.Context, cfg *config.Config, srcCfg *config.Sourc
 	}
 
 	return &aggregator{
-		client:         client,
-		onramp:         onramp,
-		onrampAddr:     onRampContractAddress,
-		proverAddr:     proverContractAddress,
-		payoutAddr:     payoutAddress,
-		auth:           auth,
-		ch:             make(chan DataReadyEvent, 1024), // buffer many events since consumer sometimes waits for chain
-		transfers:      make(map[int]AggregateTransfer),
-		transferLk:     sync.RWMutex{},
-		transferAddr:   fmt.Sprintf("%s:%d", cfg.TransferIP, cfg.TransferPort),
-		abi:            parsedABI,
-		targetDealSize: uint64(cfg.TargetAggSize),
-		host:           h,
-		spDealAddr:     psPeerInfo,
-		spActorAddr:    providerAddr,
-		lotusAPI:       lAPI,
-		LighthouseAuth: cfg.LighthouseAuth,
+		client:           client,
+		onramp:           onramp,
+		onrampAddr:       onRampContractAddress,
+		proverAddr:       proverContractAddress,
+		payoutAddr:       payoutAddress,
+		auth:             auth,
+		ch:               make(chan DataReadyEvent, 1024), // buffer many events since consumer sometimes waits for chain
+		transfers:        make(map[int]AggregateTransfer),
+		transferLk:       sync.RWMutex{},
+		transferAddr:     fmt.Sprintf("%s:%d", cfg.TransferIP, cfg.TransferPort),
+		abi:              parsedABI,
+		targetDealSize:   uint64(cfg.TargetAggSize),
+		minDealSize:      uint64(cfg.MinDealSize),
+		host:             h,
+		spDealAddr:       psPeerInfo,
+		spActorAddr:      providerAddr,
+		lotusAPI:         lAPI,
+		LighthouseAuth:   cfg.LighthouseAuth,
+		lighthouseApiKey: cfg.LighthouseApiKey,
 		cleanup: func() {
 			closer()
 			log.Printf("done with lotus api closer\n")
@@ -272,7 +279,7 @@ func (a *aggregator) run(ctx context.Context) error {
 	// Start handling data transfer requests
 	g.Go(func() error {
 		http.HandleFunc("/", a.transferHandler)
-		log.Printf("Server starting on port %d\n", transferPort)
+		log.Printf("Data transfer server starting at %s\n", a.transferAddr)
 		server := &http.Server{
 			Addr:    a.transferAddr,
 			Handler: nil, // http.DefaultServeMux
@@ -295,12 +302,8 @@ func (a *aggregator) runAggregate(ctx context.Context) error {
 	// pieces being aggregated, flushed upon commitment
 	// Invariant: the pieces in the pending queue can always make a valid aggregate w.r.t a.targetDealSize
 	fmt.Println("Start running aggregation.")
-	pending := make([]DataReadyEvent, 0, 256)
+	var pending []DataReadyEvent
 	total := uint64(0)
-	prefixPiece := filabi.PieceInfo{
-		Size:     filabi.PaddedPieceSize(prefixCARSizePadded),
-		PieceCID: cid.MustParse(prefixCARCid),
-	}
 
 	for {
 		select {
@@ -308,55 +311,67 @@ func (a *aggregator) runAggregate(ctx context.Context) error {
 			log.Printf("ctx done shutting down aggregation")
 			return nil
 		case latestEvent := <-a.ch:
-			// Check if the offer is too big to fit in a valid aggregate on its own
-			// TODO: as referenced below there must be a better way when we introspect on the gory details of NewAggregate
-			latestPiece, err := latestEvent.Offer.Piece()
-			if err != nil {
-				log.Printf("skipping offer %d, size %d not valid padded piece size ", latestEvent.OfferID, latestEvent.Offer.Size)
-				continue
-			}
-			_, err = datasegment.NewAggregate(filabi.PaddedPieceSize(a.targetDealSize), []filabi.PieceInfo{
-				prefixPiece,
-				latestPiece,
-			})
-			if err != nil {
-				log.Printf("error creating aggregate: %s", err)
-				continue
-			}
-			// TODO: in production we'll maybe want to move data from buffer before we commit to storing it.
-
-			// TODO: Unsorted greedy is a very naive knapsack strategy, production will want something better
-			// TODO: doing all the work of creating an aggregate for every new offer is quite wasteful
-			//      there must be a cheaper way to do this, but for now it is the most expediant without learning
-			//      all the gory edge cases in NewAggregate
-
-			// Turn offers into datasegment pieces
-			pieces := make([]filabi.PieceInfo, len(pending)+1)
-			for i, event := range pending {
-				piece, err := event.Offer.Piece()
+			if len(pending) >= 1 {
+				// Comment out to test
+				// Check if the offer is too big to fit in a valid aggregate on its own
+				// TODO: as referenced below there must be a better way when we introspect on the gory details of NewAggregate
+				latestPiece, err := latestEvent.Offer.Piece()
 				if err != nil {
-					return err
+					log.Printf("skipping offer %d, size %d not valid padded piece size ", latestEvent.OfferID, latestEvent.Offer.Size)
+					continue
 				}
-				pieces[i] = piece
-			}
+				pending = append(pending, latestEvent)
 
-			pieces[len(pending)] = latestPiece
-			// aggregate
-			aggregatePieces := append([]filabi.PieceInfo{
-				prefixPiece,
-			}, pieces...)
-			_, err = datasegment.NewAggregate(filabi.PaddedPieceSize(a.targetDealSize), aggregatePieces)
-			if err != nil { // we've overshot, lets commit to just pieces in pending
+				_, err = datasegment.NewAggregate(filabi.PaddedPieceSize(a.targetDealSize), []filabi.PieceInfo{
+					latestPiece,
+				})
+				if err != nil {
+					log.Printf("skipping offer %d, size %d exceeds max PODSI packable size", latestEvent.OfferID, latestEvent.Offer.Size)
+					continue
+				}
+				// TODO: in production we'll maybe want to move data from buffer before we commit to storing it.
+
+				// TODO: Unsorted greedy is a very naive knapsack strategy, production will want something better
+				// TODO: doing all the work of creating an aggregate for every new offer is quite wasteful
+				//      there must be a cheaper way to do this, but for now it is the most expediant without learning
+				//      all the gory edge cases in NewAggregate
+
+				// Turn offers into datasegment pieces
+				pieces := make([]filabi.PieceInfo, len(pending))
+				for i, event := range pending {
+					piece, err := event.Offer.Piece()
+					if err != nil {
+						return err
+					}
+					pieces[i] = piece
+				}
+
+				// aggregation process
+				aggregatePieces := pieces
+				log.Println("Aggregated Pieces are:", aggregatePieces)
+				_, size, err := datasegment.ComputeDealPlacement(aggregatePieces)
+				if err != nil {
+					panic(err)
+				}
+				overallSize := filabi.PaddedPieceSize(size)
+				log.Printf("Aggregated Piece Size is %d", overallSize)
+
+				next := 1 << (64 - bits.LeadingZeros64(uint64(overallSize+256)))
+				if next < int(a.minDealSize) {
+					next = int(a.minDealSize)
+				}
+				dealSize := filabi.PaddedPieceSize(next)
+				a.targetDealSize = uint64(dealSize)
+				log.Printf("Target DealSize is %d.", a.targetDealSize)
+
 				total = 0
-				// Remove the latest offer which took us over
-				pieces = pieces[:len(pieces)-1]
-				aggregatePieces = aggregatePieces[:len(aggregatePieces)-1]
-				fmt.Println("subdeals are: ", len(aggregatePieces))
+
 				agg, err := datasegment.NewAggregate(filabi.PaddedPieceSize(a.targetDealSize), aggregatePieces)
 				if err != nil {
 					return fmt.Errorf("failed to create aggregate from pending, should not be reachable: %w", err)
 				}
 
+				//Generates Podsi inclusion proof from aggregation
 				inclProofs := make([]merkletree.ProofData, len(pieces))
 				ids := make([]uint64, len(pieces))
 				for i, piece := range pieces {
@@ -367,6 +382,8 @@ func (a *aggregator) runAggregate(ctx context.Context) error {
 					ids[i] = pending[i].OfferID
 					inclProofs[i] = podsi.ProofSubtree // Only do data proofs on chain for now not index proofs
 				}
+
+				//Sending aggCommp and inclusion proof to onramp contracts
 				aggCommp, err := agg.PieceCID()
 				if err != nil {
 					return err
@@ -396,21 +413,55 @@ func (a *aggregator) runAggregate(ctx context.Context) error {
 				}
 				a.transferID++
 				a.transferLk.Unlock()
-				log.Printf("Transfer ID %d scheduled for aggregate %s", transferID, aggCommp.String())
+				log.Printf("Transfer ID %d scheduled for aggregation %s with %d urls.", transferID, aggCommp.String(), len(locations))
 
-				err = a.sendDeal(ctx, aggCommp, transferID)
+				// Aggregate data into a file
+				homeDir, err := os.UserHomeDir()
+				if err != nil {
+					fmt.Println("Error:", err)
+					return nil
+				}
+				aggLocation := filepath.Join(homeDir, "/.xchain/", aggCommp.String())
+				err = a.saveAggregateToFile(transferID, aggLocation)
+				if err != nil {
+					log.Fatalf("failed to save aggregate to file: %s", err)
+				} else {
+					log.Println("Saved aggregated data into a file.")
+				}
+
+				// send file to lighthouse
+				lhResp, err := buffer.UploadToLighthouse(aggLocation, a.lighthouseApiKey)
+				if err != nil {
+					log.Fatalf("failed to upload to lighthouse: %s", err)
+				}
+				retrievalURL := fmt.Sprintf("https://gateway.lighthouse.storage/ipfs/%s", lhResp.Hash)
+				log.Printf("Uploaded CAR size is %s", lhResp.Size)
+
+				// Make storage deal on Filecoin network.
+				err = a.sendDeal(ctx, aggCommp, transferID, retrievalURL)
 				if err != nil {
 					log.Printf("[ERROR] failed to send deal: %s", err)
 				}
 
-				// Reset queue to empty, add the event that triggered aggregation
+				// Reset event log queue to empty
 				pending = pending[:0]
-				pending = append(pending, latestEvent)
-
 			} else {
+				latestPiece, err := latestEvent.Offer.Piece()
+				if err != nil {
+					log.Printf("skipping offer %d, size %d not valid padded piece size ", latestEvent.OfferID, latestEvent.Offer.Size)
+					continue
+				}
+				_, err = datasegment.NewAggregate(filabi.PaddedPieceSize(a.targetDealSize), []filabi.PieceInfo{
+					// prefixPiece,
+					latestPiece,
+				})
+				if err != nil {
+					log.Printf("skipping offer %d, size %d exceeds max PODSI packable size", latestEvent.OfferID, latestEvent.Offer.Size)
+					continue
+				}
 				total += latestEvent.Offer.Size
 				pending = append(pending, latestEvent)
-				log.Printf("Offer %d added. %d offers pending aggregation with total size=%d\n", latestEvent.OfferID, len(pending), total)
+				log.Printf("Offer-%d added. %d offers pending aggregation with total size=%d\n", latestEvent.OfferID, len(pending), total)
 			}
 		}
 	}
@@ -419,7 +470,7 @@ func (a *aggregator) runAggregate(ctx context.Context) error {
 // Send deal data to the configured SP deal making address (boost node)
 // The deal is made with the configured prover client contract
 // Heavily inspired by boost client
-func (a *aggregator) sendDeal(ctx context.Context, aggCommp cid.Cid, transferID int) error {
+func (a *aggregator) sendDeal(ctx context.Context, aggCommp cid.Cid, transferID int, url string) error {
 	if err := a.host.Connect(ctx, *a.spDealAddr); err != nil {
 		return fmt.Errorf("failed to connect to peer %s: %w", a.spDealAddr.ID, err)
 	}
@@ -433,19 +484,25 @@ func (a *aggregator) sendDeal(ctx context.Context, aggCommp cid.Cid, transferID 
 
 	// Construct deal
 	dealUuid := uuid.New()
-	log.Printf("making deal for commp %s, UUID=%s\n", aggCommp.String(), dealUuid)
-	transferParams := boosttypes2.HttpRequest{
-		URL: fmt.Sprintf("http://%s/?id=%d", a.transferAddr, transferID),
+	log.Printf("making deal for commp=%s, UUID=%s\n", aggCommp.String(), dealUuid)
+
+	if url == "" {
+		url = fmt.Sprintf("http://%s/?id=%d", a.transferAddr, transferID)
 	}
+
+	transferParams := boosttypes2.HttpRequest{
+		URL: url,
+	}
+	log.Printf("transfer URL: %s", url)
 	paramsBytes, err := json.Marshal(transferParams)
 	if err != nil {
 		return fmt.Errorf("failed to marshal transfer params: %w", err)
 	}
 	transfer := boosttypes.Transfer{
-		Type:     "http",
-		ClientID: fmt.Sprintf("%d", transferID),
-		Params:   paramsBytes,
-		Size:     a.targetDealSize - a.targetDealSize/128, // aggregate for transfer is not fr32 encoded
+		Type: "http",
+		//ClientID: fmt.Sprintf("%d", transferID),
+		Params: paramsBytes,
+		Size:   a.targetDealSize - a.targetDealSize/128, // aggregate for transfer is not fr32 encoded
 	}
 
 	bounds, err := a.lotusAPI.StateDealProviderCollateralBounds(ctx, filabi.PaddedPieceSize(a.targetDealSize), false, lotustypes.EmptyTSK)
@@ -461,23 +518,26 @@ func (a *aggregator) sendDeal(ctx context.Context, aggCommp cid.Cid, transferID 
 	dealStart := filHeight + dealDelayEpochs
 	dealEnd := dealStart + dealDuration
 	filClient, err := address.NewDelegatedAddress(builtintypes.EthereumAddressManagerActorID, a.proverAddr[:])
+	log.Printf("filClient = %s", filClient.String())
 	if err != nil {
 		return fmt.Errorf("failed to translate onramp address (%s) into a "+
 			"Filecoin f4 address: %w", a.onrampAddr.Hex(), err)
 	}
 	chainID, err := a.client.ChainID(ctx)
+	log.Printf("chainID = %d", chainID)
 	if err != nil {
 		return fmt.Errorf("failed to get chain ID: %w", err)
 	}
 	// Encode the chainID as uint256
-	encodedChainID, err := utils.EncodeChainID(chainID)
+	encodedChainID, err := utils.EncodeChainIDAsString(chainID)
 	if err != nil {
 		return fmt.Errorf("failed to encode chainID: %w", err)
 	}
-	dealLabel, err := market.NewLabelFromBytes(encodedChainID)
+	dealLabel, err := market.NewLabelFromString(encodedChainID)
 	if err != nil {
 		return fmt.Errorf("failed to create deal label: %w", err)
 	}
+	log.Println("Start creating ClientDealProposal.")
 	proposal := market.ClientDealProposal{
 		Proposal: market.DealProposal{
 			PieceCID:             aggCommp,
@@ -485,11 +545,11 @@ func (a *aggregator) sendDeal(ctx context.Context, aggCommp cid.Cid, transferID 
 			VerifiedDeal:         true,
 			Client:               filClient,
 			Provider:             a.spActorAddr,
+			Label:                dealLabel,
 			StartEpoch:           dealStart,
 			EndEpoch:             dealEnd,
 			StoragePricePerEpoch: fbig.NewInt(0),
 			ProviderCollateral:   providerCollateral,
-			Label:                dealLabel,
 		},
 		// Signature is unchecked since client is smart contract
 		ClientSignature: crypto.Signature{
@@ -507,6 +567,20 @@ func (a *aggregator) sendDeal(ctx context.Context, aggCommp cid.Cid, transferID 
 		RemoveUnsealedCopy: false,
 		SkipIPNIAnnounce:   false,
 	}
+	fmt.Println(dealParams.ClientDealProposal)
+	log.Println("-------------------DealProposal Details----------------------")
+	log.Println("DealUUID:", dealParams.DealUUID)
+	log.Println("PieceCID:", proposal.Proposal.PieceCID.String())
+	log.Println("PieceSize:", proposal.Proposal.PieceSize)
+	log.Println("VerifiedDeal:", proposal.Proposal.VerifiedDeal)
+	log.Println("Client:", proposal.Proposal.Client)
+	log.Println("Provider:", proposal.Proposal.Provider)
+	log.Println("Label:", proposal.Proposal.Label)
+	log.Println("StartEpoch:", proposal.Proposal.StartEpoch)
+	log.Println("EndEpoch:", proposal.Proposal.EndEpoch)
+	log.Println("StoragePricePerEpoch:", proposal.Proposal.StoragePricePerEpoch)
+	log.Println("ProviderCollateral:", proposal.Proposal.ProviderCollateral)
+	log.Println("---------------------------------------------------------------")
 
 	s, err := a.host.NewStream(ctx, a.spDealAddr.ID, DealProtocolv120)
 	if err != nil {
@@ -521,6 +595,7 @@ func (a *aggregator) sendDeal(ctx context.Context, aggCommp cid.Cid, transferID 
 	if !resp.Accepted {
 		return fmt.Errorf("deal proposal rejected: %s", resp.Message)
 	}
+	log.Printf("Deal UUID=%s is sent to miner %s.", dealUuid, a.spActorAddr)
 	return nil
 }
 
@@ -587,12 +662,12 @@ LOOP:
 
 			log.Printf("Sending offer NO. %d for aggregation\n", event.OfferID)
 			log.Printf("  Offer:\n")
-			log.Printf("    Offer: %v\n", event.Offer.CommP)
+			log.Printf("    CommP: %v\n", event.Offer.CommP)
 			log.Printf("    Size: %d\n", event.Offer.Size)
 			log.Printf("    Cid: %s\n", event.Offer.Cid)
 			log.Printf("    Location: %s\n", event.Offer.Location)
-			log.Printf("    Amount: %s\n", event.Offer.Amount.String()) // big.Int needs .String() for printing
-			log.Printf("    Token: %s\n", event.Offer.Token.Hex())      // Address needs .Hex() for printing
+			log.Printf("    Payment Token: %s\n", event.Offer.Token.Hex())      // Address needs .Hex() for printing
+			log.Printf("    Payment Amount: %s\n", event.Offer.Amount.String()) // big.Int needs .String() for printing
 
 			// This is where we should make packing decisions.
 			// In the current prototype we accept all offers regardless
@@ -603,8 +678,49 @@ LOOP:
 	return nil
 }
 
+func (a *aggregator) saveAggregateToFile(trensferId int, location string) error {
+	log.Printf("Saving aggregated data for transfer(%d) into a file:%s", trensferId, location)
+	a.transferLk.RLock()
+	transfer, ok := a.transfers[trensferId]
+	a.transferLk.RUnlock()
+	if !ok {
+		return fmt.Errorf("no data found for ID %d", trensferId)
+	}
+
+	readers := []io.Reader{
+		// bytes.NewReader(prefixCARBytes)
+	}
+	log.Printf("Fetching %d pieces from buffer.", len(transfer.locations))
+	// Fetch each sub piece from its buffer location and add to readers
+	for _, url := range transfer.locations {
+		lazyReader := &lazyHTTPReader{url: url}
+		readers = append(readers, lazyReader)
+		defer lazyReader.Close()
+	}
+	aggReader, err := transfer.agg.AggregateObjectReader(readers)
+	if err != nil {
+		return fmt.Errorf("failed to create aggregate reader: %w", err)
+	}
+
+	// Create the file at the specified location
+	file, err := os.Create(location)
+	if err != nil {
+		return fmt.Errorf("failed to create file: %w", err)
+	}
+	defer file.Close()
+
+	// Copy the aggregated data to the file
+	_, err = io.Copy(file, aggReader)
+	if err != nil {
+		return fmt.Errorf("failed to write aggregate stream to file: %w", err)
+	}
+
+	return nil
+}
+
 // Handle data transfer requests from boost
 func (a *aggregator) transferHandler(w http.ResponseWriter, r *http.Request) {
+	log.Println("Received data transfer from boost.")
 	w.Header().Set("Content-Type", "application/octet-stream")
 	w.Header().Set("Content-Length", strconv.Itoa(int(a.targetDealSize-a.targetDealSize/128)))
 	if r.Method == "HEAD" {

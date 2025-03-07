@@ -50,6 +50,18 @@ func EncodeChainID(chainID *big.Int) ([]byte, error) {
 	return data, nil
 }
 
+// encodeChainIDAsString converts a *big.Int chain ID to its string representation
+func EncodeChainIDAsString(chainID *big.Int) (string, error) {
+	if chainID == nil {
+		return "", fmt.Errorf("chainID cannot be nil")
+	}
+
+	// Convert the *big.Int to a string
+	chainIDStr := chainID.String()
+
+	return chainIDStr, nil
+}
+
 // Load and unlock the keystore with XCHAIN_PASSPHRASE env var
 // return a transaction authorizer
 func LoadPrivateKey(cfg *config.Config, chainId int) (*bind.TransactOpts, error) {
