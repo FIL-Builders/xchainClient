@@ -227,7 +227,7 @@ func NewAggregator(ctx context.Context, cfg *config.Config, srcCfg *config.Sourc
 		transferAddr:     fmt.Sprintf("%s:%d", cfg.TransferIP, cfg.TransferPort),
 		abi:              parsedABI,
 		targetDealSize:   uint64(cfg.TargetAggSize),
-		minDealSize:      uint64(cfg.TargetAggSize),
+		minDealSize:      uint64(cfg.MinDealSize),
 		host:             h,
 		spDealAddr:       psPeerInfo,
 		spActorAddr:      providerAddr,
@@ -316,11 +316,11 @@ func (a *aggregator) runAggregate(ctx context.Context) error {
 				// Check if the offer is too big to fit in a valid aggregate on its own
 				// TODO: as referenced below there must be a better way when we introspect on the gory details of NewAggregate
 				latestPiece, err := latestEvent.Offer.Piece()
-				pending = append(pending, latestEvent)
 				if err != nil {
 					log.Printf("skipping offer %d, size %d not valid padded piece size ", latestEvent.OfferID, latestEvent.Offer.Size)
 					continue
 				}
+				pending = append(pending, latestEvent)
 
 				_, err = datasegment.NewAggregate(filabi.PaddedPieceSize(a.targetDealSize), []filabi.PieceInfo{
 					latestPiece,
@@ -354,7 +354,7 @@ func (a *aggregator) runAggregate(ctx context.Context) error {
 					panic(err)
 				}
 				overallSize := filabi.PaddedPieceSize(size)
-				log.Printf("Aggregated PaddedPieceSize is %d", overallSize)
+				log.Printf("Aggregated Piece Size is %d", overallSize)
 
 				next := 1 << (64 - bits.LeadingZeros64(uint64(overallSize+256)))
 				if next < int(a.minDealSize) {
@@ -517,9 +517,7 @@ func (a *aggregator) sendDeal(ctx context.Context, aggCommp cid.Cid, transferID 
 	filHeight := tipset.Height()
 	dealStart := filHeight + dealDelayEpochs
 	dealEnd := dealStart + dealDuration
-	address.CurrentNetwork = address.Testnet
 	filClient, err := address.NewDelegatedAddress(builtintypes.EthereumAddressManagerActorID, a.proverAddr[:])
-	log.Println(address.CurrentNetwork)
 	log.Printf("filClient = %s", filClient.String())
 	if err != nil {
 		return fmt.Errorf("failed to translate onramp address (%s) into a "+
@@ -569,6 +567,7 @@ func (a *aggregator) sendDeal(ctx context.Context, aggCommp cid.Cid, transferID 
 		RemoveUnsealedCopy: false,
 		SkipIPNIAnnounce:   false,
 	}
+	fmt.Println(dealParams.ClientDealProposal)
 	log.Println("-------------------DealProposal Details----------------------")
 	log.Println("DealUUID:", dealParams.DealUUID)
 	log.Println("PieceCID:", proposal.Proposal.PieceCID.String())

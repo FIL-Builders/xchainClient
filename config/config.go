@@ -36,6 +36,7 @@ type Config struct {
 	TransferIP       string                       `json:"TransferIP"`
 	TransferPort     int                          `json:"TransferPort"`
 	TargetAggSize    int                          `json:"TargetAggSize"`
+	MinDealSize      int                          `json:"MinDealSize"`
 }
 
 // LoadConfig reads the configuration from a JSON file.
