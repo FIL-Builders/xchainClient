@@ -311,7 +311,7 @@ func (a *aggregator) runAggregate(ctx context.Context) error {
 			log.Printf("ctx done shutting down aggregation")
 			return nil
 		case latestEvent := <-a.ch:
-			if len(pending) >= 1 {
+			{
 				// Comment out to test
 				// Check if the offer is too big to fit in a valid aggregate on its own
 				// TODO: as referenced below there must be a better way when we introspect on the gory details of NewAggregate
@@ -320,7 +320,6 @@ func (a *aggregator) runAggregate(ctx context.Context) error {
 					log.Printf("skipping offer %d, size %d not valid padded piece size ", latestEvent.OfferID, latestEvent.Offer.Size)
 					continue
 				}
-				pending = append(pending, latestEvent)
 
 				_, err = datasegment.NewAggregate(filabi.PaddedPieceSize(a.targetDealSize), []filabi.PieceInfo{
 					latestPiece,
@@ -329,12 +328,7 @@ func (a *aggregator) runAggregate(ctx context.Context) error {
 					log.Printf("skipping offer %d, size %d exceeds max PODSI packable size", latestEvent.OfferID, latestEvent.Offer.Size)
 					continue
 				}
-				// TODO: in production we'll maybe want to move data from buffer before we commit to storing it.
-
-				// TODO: Unsorted greedy is a very naive knapsack strategy, production will want something better
-				// TODO: doing all the work of creating an aggregate for every new offer is quite wasteful
-				//      there must be a cheaper way to do this, but for now it is the most expediant without learning
-				//      all the gory edge cases in NewAggregate
+				pending = append(pending, latestEvent)
 
 				// Turn offers into datasegment pieces
 				pieces := make([]filabi.PieceInfo, len(pending))
@@ -357,111 +351,94 @@ func (a *aggregator) runAggregate(ctx context.Context) error {
 				log.Printf("Aggregated Piece Size is %d", overallSize)
 
 				next := 1 << (64 - bits.LeadingZeros64(uint64(overallSize+256)))
-				if next < int(a.minDealSize) {
-					next = int(a.minDealSize)
-				}
-				dealSize := filabi.PaddedPieceSize(next)
-				a.targetDealSize = uint64(dealSize)
-				log.Printf("Target DealSize is %d.", a.targetDealSize)
+				if next <= int(a.minDealSize) {
+					total += latestEvent.Offer.Size
+					log.Printf("Offer-%d added. %d offers pending aggregation with total size=%d\n", latestEvent.OfferID, len(pending), total)
+				} else {
+					dealSize := filabi.PaddedPieceSize(next)
+					a.targetDealSize = uint64(dealSize)
+					log.Printf("Target DealSize is %d.", a.targetDealSize)
 
-				total = 0
+					agg, err := datasegment.NewAggregate(filabi.PaddedPieceSize(a.targetDealSize), aggregatePieces)
+					if err != nil {
+						return fmt.Errorf("failed to create aggregate from pending, should not be reachable: %w", err)
+					}
 
-				agg, err := datasegment.NewAggregate(filabi.PaddedPieceSize(a.targetDealSize), aggregatePieces)
-				if err != nil {
-					return fmt.Errorf("failed to create aggregate from pending, should not be reachable: %w", err)
-				}
+					//Generates Podsi inclusion proof from aggregation
+					inclProofs := make([]merkletree.ProofData, len(pieces))
+					ids := make([]uint64, len(pieces))
+					for i, piece := range pieces {
+						podsi, err := agg.ProofForPieceInfo(piece)
+						if err != nil {
+							return err
+						}
+						ids[i] = pending[i].OfferID
+						inclProofs[i] = podsi.ProofSubtree // Only do data proofs on chain for now not index proofs
+					}
 
-				//Generates Podsi inclusion proof from aggregation
-				inclProofs := make([]merkletree.ProofData, len(pieces))
-				ids := make([]uint64, len(pieces))
-				for i, piece := range pieces {
-					podsi, err := agg.ProofForPieceInfo(piece)
+					//Sending aggCommp and inclusion proof to onramp contracts
+					aggCommp, err := agg.PieceCID()
 					if err != nil {
 						return err
 					}
-					ids[i] = pending[i].OfferID
-					inclProofs[i] = podsi.ProofSubtree // Only do data proofs on chain for now not index proofs
-				}
+					tx, err := a.onramp.Transact(a.auth, "commitAggregate", aggCommp.Bytes(), ids, inclProofs, a.payoutAddr)
+					if err != nil {
+						return err
+					}
+					receipt, err := bind.WaitMined(ctx, a.client, tx)
+					if err != nil {
+						return err
+					}
+					log.Printf("Tx %s committing aggregate commp %s included: %d", tx.Hash().Hex(), aggCommp.String(), receipt.Status)
 
-				//Sending aggCommp and inclusion proof to onramp contracts
-				aggCommp, err := agg.PieceCID()
-				if err != nil {
-					return err
-				}
-				tx, err := a.onramp.Transact(a.auth, "commitAggregate", aggCommp.Bytes(), ids, inclProofs, a.payoutAddr)
-				if err != nil {
-					return err
-				}
-				receipt, err := bind.WaitMined(ctx, a.client, tx)
-				if err != nil {
-					return err
-				}
-				log.Printf("Tx %s committing aggregate commp %s included: %d", tx.Hash().Hex(), aggCommp.String(), receipt.Status)
+					// Schedule aggregate data for transfer
+					// After adding to the map this is now served in aggregator.transferHandler at `/?id={transferID}`
+					locations := make([]string, len(pending))
+					for i, event := range pending {
+						locations[i] = event.Offer.Location
+					}
+					var transferID int
+					a.transferLk.Lock()
+					transferID = a.transferID
+					a.transfers[transferID] = AggregateTransfer{
+						locations: locations,
+						agg:       agg,
+					}
+					a.transferID++
+					a.transferLk.Unlock()
+					log.Printf("Transfer ID %d scheduled for aggregation %s with %d urls.", transferID, aggCommp.String(), len(locations))
 
-				// Schedule aggregate data for transfer
-				// After adding to the map this is now served in aggregator.transferHandler at `/?id={transferID}`
-				locations := make([]string, len(pending))
-				for i, event := range pending {
-					locations[i] = event.Offer.Location
-				}
-				var transferID int
-				a.transferLk.Lock()
-				transferID = a.transferID
-				a.transfers[transferID] = AggregateTransfer{
-					locations: locations,
-					agg:       agg,
-				}
-				a.transferID++
-				a.transferLk.Unlock()
-				log.Printf("Transfer ID %d scheduled for aggregation %s with %d urls.", transferID, aggCommp.String(), len(locations))
+					// Aggregate data into a file
+					homeDir, err := os.UserHomeDir()
+					if err != nil {
+						fmt.Println("Error:", err)
+						return nil
+					}
+					aggLocation := filepath.Join(homeDir, "/.xchain/", aggCommp.String())
+					err = a.saveAggregateToFile(transferID, aggLocation)
+					if err != nil {
+						log.Fatalf("failed to save aggregate to file: %s", err)
+					} else {
+						log.Println("Saved aggregated data into a file.")
+					}
 
-				// Aggregate data into a file
-				homeDir, err := os.UserHomeDir()
-				if err != nil {
-					fmt.Println("Error:", err)
-					return nil
-				}
-				aggLocation := filepath.Join(homeDir, "/.xchain/", aggCommp.String())
-				err = a.saveAggregateToFile(transferID, aggLocation)
-				if err != nil {
-					log.Fatalf("failed to save aggregate to file: %s", err)
-				} else {
-					log.Println("Saved aggregated data into a file.")
-				}
+					// send file to lighthouse
+					lhResp, err := buffer.UploadToLighthouse(aggLocation, a.lighthouseApiKey)
+					if err != nil {
+						log.Fatalf("failed to upload to lighthouse: %s", err)
+					}
+					retrievalURL := fmt.Sprintf("https://gateway.lighthouse.storage/ipfs/%s", lhResp.Hash)
+					log.Printf("Uploaded CAR size is %s", lhResp.Size)
 
-				// send file to lighthouse
-				lhResp, err := buffer.UploadToLighthouse(aggLocation, a.lighthouseApiKey)
-				if err != nil {
-					log.Fatalf("failed to upload to lighthouse: %s", err)
-				}
-				retrievalURL := fmt.Sprintf("https://gateway.lighthouse.storage/ipfs/%s", lhResp.Hash)
-				log.Printf("Uploaded CAR size is %s", lhResp.Size)
+					// Make storage deal on Filecoin network.
+					err = a.sendDeal(ctx, aggCommp, transferID, retrievalURL)
+					if err != nil {
+						log.Printf("[ERROR] failed to send deal: %s", err)
+					}
 
-				// Make storage deal on Filecoin network.
-				err = a.sendDeal(ctx, aggCommp, transferID, retrievalURL)
-				if err != nil {
-					log.Printf("[ERROR] failed to send deal: %s", err)
+					// Reset event log queue to empty
+					pending = pending[:0]
 				}
-
-				// Reset event log queue to empty
-				pending = pending[:0]
-			} else {
-				latestPiece, err := latestEvent.Offer.Piece()
-				if err != nil {
-					log.Printf("skipping offer %d, size %d not valid padded piece size ", latestEvent.OfferID, latestEvent.Offer.Size)
-					continue
-				}
-				_, err = datasegment.NewAggregate(filabi.PaddedPieceSize(a.targetDealSize), []filabi.PieceInfo{
-					// prefixPiece,
-					latestPiece,
-				})
-				if err != nil {
-					log.Printf("skipping offer %d, size %d exceeds max PODSI packable size", latestEvent.OfferID, latestEvent.Offer.Size)
-					continue
-				}
-				total += latestEvent.Offer.Size
-				pending = append(pending, latestEvent)
-				log.Printf("Offer-%d added. %d offers pending aggregation with total size=%d\n", latestEvent.OfferID, len(pending), total)
 			}
 		}
 	}
