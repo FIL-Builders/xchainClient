@@ -37,6 +37,8 @@ type Config struct {
 	TransferPort     int                          `json:"TransferPort"`
 	TargetAggSize    int                          `json:"TargetAggSize"`
 	MinDealSize      int                          `json:"MinDealSize"`
+	DealDelayEpochs  int                          `json:"DealDelayEpochs"`
+	DealDuration     int                          `json:"DealDuration"`
 }
 
 // LoadConfig reads the configuration from a JSON file.

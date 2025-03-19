@@ -8,9 +8,7 @@ import (
 	"github.com/FIL-Builders/xchainClient/services/buffer"
 	"github.com/FIL-Builders/xchainClient/utils"
 
-	"bytes"
 	"context"
-	"encoding/hex"
 
 	"encoding/json"
 	"fmt"
@@ -58,24 +56,8 @@ import (
 )
 
 const (
-	// PODSI aggregation uses 64 extra bytes per piece
-	// pieceOverhead = uint64(64) TODO uncomment this when we are smarter about determining threshold crossing
-	// Piece CID of small valid car (below) that must be prepended to the aggregation for deal acceptance
-	prefixCARCid = "baga6ea4seaqiklhpuei4wz7x3wwpvnul3sscfyrz2dpi722vgpwlolfky2dmwey"
-	// Hex of the prefix car file
-	prefixCAR = "3aa265726f6f747381d82a58250001701220b9ecb605f194801ee8a8355014e7e6e62966f94ccb6081" +
-		"631e82217872209dae6776657273696f6e014101551220704a26a32a76cf3ab66ffe41eb27adefefe9c93206960bb0" +
-		"147b9ed5e1e948b0576861744966487567684576657265747449494957617352696768743f5601701220b9ecb605f1" +
-		"94801ee8a8355014e7e6e62966f94ccb6081631e82217872209dae122c0a2401551220704a26a32a76cf3ab66ffe41" +
-		"eb27adefefe9c93206960bb0147b9ed5e1e948b012026576181d0a020801"
-	// Size of the padded prefix car in bytes
-	prefixCARSizePadded = uint64(256)
 	// libp2p identifier for latest deal protocol
 	DealProtocolv120 = "/fil/storage/mk/1.2.0"
-	// Delay to start deal at. For 2k devnet 4 second block time this is 13.3 minutes TODO Config
-	dealDelayEpochs = 3000
-	// Storage deal duration, TODO figure out what to do about this, either comes from offer or config
-	dealDuration = 518400 // 6 months (on mainnet)
 )
 
 type aggregator struct {
@@ -93,6 +75,8 @@ type aggregator struct {
 	transferAddr     string                    // address to listen for transfer requests
 	minDealSize      uint64                    // minimum deal size
 	targetDealSize   uint64                    // how big aggregates should be
+	dealDelayEpochs  uint64                    // when the deal will be active, in blocks
+	dealDuration     uint64                    // how long the deal will be active, in blocks
 	host             host.Host                 // libp2p host for deal protocol to boost
 	spDealAddr       *peer.AddrInfo            // address to reach boost (or other) deal v 1.2 provider
 	spActorAddr      address.Address           // address of the storage provider actor
@@ -228,6 +212,8 @@ func NewAggregator(ctx context.Context, cfg *config.Config, srcCfg *config.Sourc
 		abi:              parsedABI,
 		targetDealSize:   uint64(cfg.TargetAggSize),
 		minDealSize:      uint64(cfg.MinDealSize),
+		dealDelayEpochs:  uint64(cfg.DealDelayEpochs),
+		dealDuration:     uint64(cfg.DealDuration),
 		host:             h,
 		spDealAddr:       psPeerInfo,
 		spActorAddr:      providerAddr,
@@ -320,12 +306,14 @@ func (a *aggregator) runAggregate(ctx context.Context) error {
 					log.Printf("skipping offer %d, size %d not valid padded piece size ", latestEvent.OfferID, latestEvent.Offer.Size)
 					continue
 				}
+				log.Println("Extraced PieceC from Offer:", latestPiece)
 
 				_, err = datasegment.NewAggregate(filabi.PaddedPieceSize(a.targetDealSize), []filabi.PieceInfo{
 					latestPiece,
 				})
+
 				if err != nil {
-					log.Printf("skipping offer %d, size %d exceeds max PODSI packable size", latestEvent.OfferID, latestEvent.Offer.Size)
+					log.Printf("skipping offer %d, size %d exceeds max PODSI packable size. %w", latestEvent.OfferID, latestEvent.Offer.Size, err)
 					continue
 				}
 				pending = append(pending, latestEvent)
@@ -492,8 +480,8 @@ func (a *aggregator) sendDeal(ctx context.Context, aggCommp cid.Cid, transferID 
 		return fmt.Errorf("cannot get chain head: %w", err)
 	}
 	filHeight := tipset.Height()
-	dealStart := filHeight + dealDelayEpochs
-	dealEnd := dealStart + dealDuration
+	dealStart := filHeight + filabi.ChainEpoch(a.dealDelayEpochs)
+	dealEnd := dealStart + filabi.ChainEpoch(a.dealDuration)
 	filClient, err := address.NewDelegatedAddress(builtintypes.EthereumAddressManagerActorID, a.proverAddr[:])
 	log.Printf("filClient = %s", filClient.String())
 	if err != nil {
@@ -723,14 +711,8 @@ func (a *aggregator) transferHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "No data found", http.StatusNotFound)
 		return
 	}
-	// First write the CAR prefix to the response
-	prefixCARBytes, err := hex.DecodeString(prefixCAR)
-	if err != nil {
-		http.Error(w, "Failed to decode CAR prefix", http.StatusInternalServerError)
-		return
-	}
 
-	readers := []io.Reader{bytes.NewReader(prefixCARBytes)}
+	readers := []io.Reader{}
 	// Fetch each sub piece from its buffer location and write to response
 	for _, url := range transfer.locations {
 		lazyReader := &lazyHTTPReader{url: url}
