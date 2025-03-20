@@ -313,7 +313,7 @@ func (a *aggregator) runAggregate(ctx context.Context) error {
 				})
 
 				if err != nil {
-					log.Printf("skipping offer %d, size %d exceeds max PODSI packable size. %w", latestEvent.OfferID, latestEvent.Offer.Size, err)
+					fmt.Errorf("skipping offer %d, size %d exceeds max PODSI packable size. %w", latestEvent.OfferID, latestEvent.Offer.Size, err)
 					continue
 				}
 				pending = append(pending, latestEvent)
