@@ -11,6 +11,7 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"time"
 
 	"golang.org/x/sync/errgroup"
 
@@ -129,6 +130,64 @@ func main() {
 							},
 						},
 						Action: client.OfferCarAction,
+					},
+					{
+						Name:  "list-deals",
+						Usage: "List all recorded deals",
+						Action: func(cctx *cli.Context) error {
+							deals, err := deal.ListAllDeals()
+							if err != nil {
+								return fmt.Errorf("failed to list deals: %w", err)
+							}
+
+							if len(deals) == 0 {
+								fmt.Println("No deals found")
+								return nil
+							}
+
+							fmt.Printf("Found %d deals:\n\n", len(deals))
+							for _, d := range deals {
+								fmt.Printf("Deal UUID: %s\n", d.DealUUID)
+								fmt.Printf("  PieceCID: %s\n", d.PieceCID)
+								fmt.Printf("  Provider: %s\n", d.Provider)
+								fmt.Printf("  Size: %d\n", d.Size)
+								fmt.Printf("  Status: %s\n", d.Status)
+								fmt.Printf("  Created: %s\n", d.CreatedAt.Format(time.RFC3339))
+								fmt.Printf("  Last Checked: %s\n\n", d.LastChecked.Format(time.RFC3339))
+							}
+							return nil
+						},
+					},
+					{
+						Name:      "deal-status",
+						Usage:     "Check the status of a specific deal",
+						ArgsUsage: "<deal-uuid>",
+						Action: func(cctx *cli.Context) error {
+							if cctx.Args().Len() != 1 {
+								return fmt.Errorf("Usage: deal-status <deal-uuid>")
+							}
+
+							dealUUID := cctx.Args().First()
+							dealInfo, err := deal.GetDealByUUID(dealUUID)
+							if err != nil {
+								return fmt.Errorf("failed to get deal info: %w", err)
+							}
+
+							fmt.Printf("Deal UUID: %s\n", dealInfo.DealUUID)
+							fmt.Printf("PieceCID: %s\n", dealInfo.PieceCID)
+							fmt.Printf("Provider: %s\n", dealInfo.Provider)
+							fmt.Printf("Client: %s\n", dealInfo.Client)
+							fmt.Printf("Size: %d\n", dealInfo.Size)
+							fmt.Printf("Start Epoch: %d\n", dealInfo.StartEpoch)
+							fmt.Printf("End Epoch: %d\n", dealInfo.EndEpoch)
+							fmt.Printf("Transfer ID: %d\n", dealInfo.TransferID)
+							fmt.Printf("Retrieval URL: %s\n", dealInfo.RetrievalURL)
+							fmt.Printf("Status: %s\n", dealInfo.Status)
+							fmt.Printf("Created: %s\n", dealInfo.CreatedAt.Format(time.RFC3339))
+							fmt.Printf("Last Checked: %s\n", dealInfo.LastChecked.Format(time.RFC3339))
+
+							return nil
+						},
 					},
 				},
 			},

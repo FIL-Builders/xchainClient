@@ -130,6 +130,22 @@ type (
 	LotusTSK               = lotustypes.TipSetKey
 )
 
+// DealInfo represents the details of a storage deal
+type DealInfo struct {
+	DealUUID     uuid.UUID         `json:"dealUUID"`
+	PieceCID     cid.Cid           `json:"pieceCID"`
+	Provider     address.Address   `json:"provider"`
+	Client       address.Address   `json:"client"`
+	Size         uint64            `json:"size"`
+	StartEpoch   filabi.ChainEpoch `json:"startEpoch"`
+	EndEpoch     filabi.ChainEpoch `json:"endEpoch"`
+	TransferID   int               `json:"transferID"`
+	RetrievalURL string            `json:"retrievalURL"`
+	Status       string            `json:"status"`
+	CreatedAt    time.Time         `json:"createdAt"`
+	LastChecked  time.Time         `json:"lastChecked"`
+}
+
 // Function to start the aggregation service
 func StartAggregationService(ctx context.Context, cfg *config.Config, srcCfg *config.SourceChainConfig) error {
 	aggregator, err := NewAggregator(ctx, cfg, srcCfg)
@@ -560,7 +576,28 @@ func (a *aggregator) sendDeal(ctx context.Context, aggCommp cid.Cid, transferID 
 	if !resp.Accepted {
 		return fmt.Errorf("deal proposal rejected: %s", resp.Message)
 	}
-	log.Printf("Deal UUID=%s is sent to miner %s.", dealUuid, a.spActorAddr)
+
+	// Record deal information
+	dealInfo := DealInfo{
+		DealUUID:     dealUuid,
+		PieceCID:     aggCommp,
+		Provider:     a.spActorAddr,
+		Client:       filClient,
+		Size:         a.targetDealSize,
+		StartEpoch:   dealStart,
+		EndEpoch:     dealEnd,
+		TransferID:   transferID,
+		RetrievalURL: url,
+		Status:       "proposed",
+		CreatedAt:    time.Now(),
+		LastChecked:  time.Now(),
+	}
+
+	if err := a.saveDealInfo(dealInfo); err != nil {
+		log.Printf("Warning: Failed to save deal info: %v", err)
+	}
+
+	log.Printf("Deal UUID=%s is sent to miner %s and recorded.", dealUuid, a.spActorAddr)
 	return nil
 }
 
@@ -827,3 +864,31 @@ func NewLotusDaemonAPIClientV0(ctx context.Context, url string, timeoutSecs int,
 }
 
 var hasV0Suffix = regexp.MustCompile(`\/rpc\/v0\/?\z`)
+
+// saveDealInfo saves deal information to a JSON file
+func (a *aggregator) saveDealInfo(deal DealInfo) error {
+	// Create .xchain directory if it doesn't exist
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return fmt.Errorf("failed to get home directory: %w", err)
+	}
+
+	dealsDir := filepath.Join(homeDir, ".xchain", "deals")
+	if err := os.MkdirAll(dealsDir, 0755); err != nil {
+		return fmt.Errorf("failed to create deals directory: %w", err)
+	}
+
+	// Save deal info to a JSON file named by deal UUID
+	filename := filepath.Join(dealsDir, fmt.Sprintf("%s.json", deal.DealUUID.String()))
+	dealData, err := json.MarshalIndent(deal, "", "  ")
+	if err != nil {
+		return fmt.Errorf("failed to marshal deal info: %w", err)
+	}
+
+	if err := os.WriteFile(filename, dealData, 0644); err != nil {
+		return fmt.Errorf("failed to write deal info file: %w", err)
+	}
+
+	log.Printf("Deal info saved to %s", filename)
+	return nil
+}
