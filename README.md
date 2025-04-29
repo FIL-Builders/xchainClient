@@ -2,7 +2,6 @@
 
 The xchainClient provides a set of tools to facilitate [cross-chain data bridge](https://github.com/FIL-Builders/onramp-contracts) from any blockchain to Filecoin network. It includes utilities for managing Ethereum accounts, submitting offers, and handling Filecoin deal process.
 
-
 ## 🚀 Installation
 
 Ensure you have **Go** installed. Then, clone the repository and build the project:
@@ -14,12 +13,15 @@ go build -o xchainClient ./cmd/xchain.go
 ```
 
 ### 📌 Configure Environment Variables
+
 1. Create a `.env` file to store your **XCHAIN_PASSPHRASE** (used for unlocking the keystore to interact with Ethereum compatbile chains):
-    ```sh
-    echo "export XCHAIN_PASSPHRASE=your_secure_password" > .env
-    ```
+
+   ```sh
+   echo "export XCHAIN_PASSPHRASE=your_secure_password" > .env
+   ```
 
 2. **Source the file** to load the variable into your environment before you run any xchainClient commands:
+
    ```sh
    source .env
    ```
@@ -39,6 +41,7 @@ A new command, `generate-account`, allows you to create an Ethereum keystore acc
 ```
 
 **Example Output**
+
 ```
 New Ethereum account created!
 Address: 0x123456789abcdef...
@@ -49,13 +52,15 @@ Keystore File Path: /home/user/onramp-contracts/xchain_key.json
 
 🔹 To enable xChainClient to interact with both the source and destination chains (Filecoin in this case), you need to acquire test tokens for your wallet address on each chain's testnet to cover transaction fees.
 
-- Filecoin calibration faucets: you can find [here](https://docs.filecoin.io/networks/calibration#resources). 
-- other L1 which you build your application on. 
+- Filecoin calibration faucets: you can find [here](https://docs.filecoin.io/networks/calibration#resources).
+- other L1 which you build your application on.
 
 ### 🛠 **config.json**
-To run xchainClient for your preference, we will need to update `config.json` with your preferred params. 
+
+To run xchainClient for your preference, we will need to update `config.json` with your preferred params.
 
 For example:
+
 - chain config & contracts addresses deployed on that chain.
 - ClientAddr & PayoutAddr: to pay tx fee and receive payment from Client
 - OnRampABIPath: copy compiled onramp ABI into this path.
@@ -75,6 +80,7 @@ To start the Xchain adapter daemon, run:
 ```
 
 ## Usages
+
 ### 📡 **offering data with automatic car processing**
 
 the `offer-file` command simplifies offering data by automatically:
@@ -110,23 +116,40 @@ Example:
 
 ### 🔍 **Checking Deal Status**
 
-To check the deal status for a CID:
+To check the status of a deal, you can use the following commands:
 
 ```sh
-./xchainClient client dealStatus <cid> <offerId>
+# List all deals
+./xchainClient client list-deals
+
+# Check status of a specific deal by UUID
+./xchainClient client deal-status <deal-uuid>
 ```
 
-Example:
-```sh
-./xchainClient client dealStatus bafkreihdwdcef4n 42
-```
+The deal status command will show detailed information about the deal, including:
+
+- Deal UUID
+- Piece CID
+- Provider address
+- Client address
+- Deal size
+- Start and end epochs
+- Transfer ID
+- Retrieval URL
+- Current status
+- Creation time
+- Last status check time
+
+All deals are stored in JSON format in the `~/.xchain/deals` directory, with each deal saved in a separate file named by its UUID.
 
 ## 🛠️ Configuration
 
 ### **Config File (`config.json`)**
+
 The Xchain Client uses a `config.json` file to store its settings. The configuration file should be placed inside the `config/` directory.
 
 **Example `config.json`**
+
 ```json
 {
   "destination": {
@@ -160,37 +183,40 @@ The Xchain Client uses a `config.json` file to store its settings. The configura
   "TargetAggSize": 67108864, //64MB
   "MinDealSize": 4194304, //4MB
   "DealDelayEpochs": 3000,
-  "DealDuration" : 518400
+  "DealDuration": 518400
 }
 ```
 
 ### **Configuration Fields Explained**
-| Key | Description |
-|------|------------|
-| **destination.ChainID** | Ethereum-compatible chain ID for the destination network. |
-| **destination.LotusAPI** | Filecoin Lotus API endpoint used for deal tracking. |
-| **destination.ProverAddr** | Ethereum address of the prover verifying storage deals. |
-| **sources.avalanche.ChainID** | Ethereum-compatible chain ID for the sources network. |
-| **sources.avalanche.Api** | WebSocket API for Avalanche network. |
-| **sources.avalanche.OnRampAddress** | Avalanche OnRamp contract address. |
-| **KeyPath** | Path to the keystore file that contains the Ethereum private key. |
-| **ClientAddr** | Ethereum wallet address used for making transactions. |
-| **PayoutAddr** | Address where storage rewards should be sent. |
-| **OnRampABIPath** | Path to the ABI file for the OnRamp contract. |
-| **BufferPath** | Directory where temporary storage is kept before aggregation. |
-| **BufferPort** | Port for the buffer service (`5077` by default). |
-| **ProviderAddr** | Filecoin storage provider ID. |
-| **LighthouseApiKey** | API key for interacting with Lighthouse storage (if applicable). |
-| **LighthouseAuth** | Authentication token for Lighthouse. |
-| **TransferIP** | IP address for cross-chain data transfer service (`0.0.0.0` for all interfaces). |
-| **TransferPort** | Port for the cross-chain data transfer service (`9999` by default). |
-| **TargetAggSize** | Specifies the aggregation size for deal bundling, should be power of 2. |
-| **MinDealSize** | The minimal aggregation size for a deal, should be power of 2. |
-| **DealDelayEpochs** | To calcualte storage deal starting epoch, in blocks. |
-| **DealDuration** | To calculate the storage deal validate duration, in blocks. |
+
+| Key                                 | Description                                                                      |
+| ----------------------------------- | -------------------------------------------------------------------------------- |
+| **destination.ChainID**             | Ethereum-compatible chain ID for the destination network.                        |
+| **destination.LotusAPI**            | Filecoin Lotus API endpoint used for deal tracking.                              |
+| **destination.ProverAddr**          | Ethereum address of the prover verifying storage deals.                          |
+| **sources.avalanche.ChainID**       | Ethereum-compatible chain ID for the sources network.                            |
+| **sources.avalanche.Api**           | WebSocket API for Avalanche network.                                             |
+| **sources.avalanche.OnRampAddress** | Avalanche OnRamp contract address.                                               |
+| **KeyPath**                         | Path to the keystore file that contains the Ethereum private key.                |
+| **ClientAddr**                      | Ethereum wallet address used for making transactions.                            |
+| **PayoutAddr**                      | Address where storage rewards should be sent.                                    |
+| **OnRampABIPath**                   | Path to the ABI file for the OnRamp contract.                                    |
+| **BufferPath**                      | Directory where temporary storage is kept before aggregation.                    |
+| **BufferPort**                      | Port for the buffer service (`5077` by default).                                 |
+| **ProviderAddr**                    | Filecoin storage provider ID.                                                    |
+| **LighthouseApiKey**                | API key for interacting with Lighthouse storage (if applicable).                 |
+| **LighthouseAuth**                  | Authentication token for Lighthouse.                                             |
+| **TransferIP**                      | IP address for cross-chain data transfer service (`0.0.0.0` for all interfaces). |
+| **TransferPort**                    | Port for the cross-chain data transfer service (`9999` by default).              |
+| **TargetAggSize**                   | Specifies the aggregation size for deal bundling, should be power of 2.          |
+| **MinDealSize**                     | The minimal aggregation size for a deal, should be power of 2.                   |
+| **DealDelayEpochs**                 | To calcualte storage deal starting epoch, in blocks.                             |
+| **DealDuration**                    | To calculate the storage deal validate duration, in blocks.                      |
 
 ### **Multi-Chain Support**
+
 Xchain Client supports interaction with multiple blockchains. Users can configure multiple `sources` to enable cross-chain deal submissions. Supported networks include:
+
 - **Filecoin**
 - **Avalanche**
 - **Polygon**
@@ -198,11 +224,13 @@ Xchain Client supports interaction with multiple blockchains. Users can configur
 Each source requires an **API endpoint** and an **OnRamp contract address**, which are specified under the `sources` field in `config.json`.
 
 ## 📖 **Additional Notes**
+
 - **Keep your `config.json` file secure** since it contains sensitive information like private key paths and authentication tokens.
 - **Use strong passwords** when generating Ethereum accounts.
 - **Regularly back up keystore files** to avoid losing access to funds.
 
 ## 💡 Troubleshooting
+
 **Error: "config.json not found"**
 
 Ensure the config file is correctly placed in the `config/` directory and named `config.json`.
@@ -216,7 +244,9 @@ Ensure the keystore file is correctly generated using `generate-account` and tha
 Check that your `Api` field in `config.json` is correctly set to a working Ethereum/Web3 provider.
 
 ## 🤝 **Contributing**
+
 We welcome contributions! Feel free to submit pull requests or open issues.
 
 ## 📜 **License**
+
 This project is licensed under the MIT License.
