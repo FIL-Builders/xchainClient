@@ -8,7 +8,12 @@
     "avalanche": {
       "ChainID": 43113,
       "Api": "wss://api.avax-test.network/ext/bc/C/ws",
-      "OnRampAddress": "0xb44cc5FB8CfEdE63ce1758CE0CDe0958A7702a16"
+      "OnRampAddress": "0xeE857540dddB6E6EA10a5c84f57562F11D5Fb47D"
+    },
+    "base-sepolia": {
+      "ChainID": 84532,
+      "Api": "wss://base-sepolia-rpc.publicnode.com",
+      "OnRampAddress": "0x8d227741feCB90973B338c405011916Ea72df403"
     }
   },
   "KeyPath": "./config/xchain_key.json",

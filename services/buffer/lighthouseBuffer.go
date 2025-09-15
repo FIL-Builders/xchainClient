@@ -12,7 +12,7 @@ import (
 	"time"
 )
 
-const lighthouseNodeURL = "https://node.lighthouse.storage"
+const lighthouseNodeURL = "https://upload.lighthouse.storage"
 
 type UploadFileResponse struct {
 	Name string `json:"Name"`
